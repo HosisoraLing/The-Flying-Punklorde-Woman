@@ -2084,12 +2084,13 @@ function drawBossDialogue() {
   // Semi-transparent background
   ctx.fillStyle = 'rgba(0,0,0,0.8)';
   ctx.fillRect(boxX, boxY, boxW, boxH);
-  ctx.strokeStyle = speaker === 'herta' ? '#e94560' : '#6C5CE7';
+  const borderColor = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
+  ctx.strokeStyle = borderColor;
   ctx.lineWidth = 3;
   ctx.strokeRect(boxX, boxY, boxW, boxH);
 
   // Speaker name
-  const nameColor = speaker === 'herta' ? '#e94560' : '#6C5CE7';
+  const nameColor = borderColor;
   pixelText(speakerName, boxX + 16, boxY + 20, 14, nameColor, 'left');
 
   // Dialogue text
@@ -2123,12 +2124,34 @@ function drawBossDialogue() {
     ctx.globalAlpha = 1;
   }
 
-  // Draw speaker portrait (small)
+  // Draw speaker portrait in center of screen
+  const portraitW = speaker === 'puppet' ? 100 : (speaker === 'herta' ? 140 : 80);
+  const portraitH = speaker === 'puppet' ? 120 : (speaker === 'herta' ? 160 : 80);
+  const portraitX = W / 2 - portraitW / 2;
+  const portraitY = boxY - portraitH - 20;
+
+  // Portrait background glow
+  ctx.save();
+  ctx.globalAlpha = 0.2;
+  ctx.shadowColor = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
+  ctx.fillRect(portraitX - 4, portraitY - 4, portraitW + 8, portraitH + 8);
+  ctx.restore();
+
+  // Portrait image
   if (speaker === 'herta') {
-    ctx.drawImage(bossImg, boxX + boxW - 70, boxY + 10, 50, 50);
+    ctx.drawImage(bossImg, portraitX, portraitY, portraitW, portraitH);
+  } else if (speaker === 'puppet') {
+    ctx.drawImage(puppetImg, portraitX, portraitY, portraitW, portraitH);
   } else {
-    ctx.drawImage(birdImg, boxX + boxW - 60, boxY + 10, 40, 40);
+    ctx.drawImage(birdImg, portraitX, portraitY, portraitW, portraitH);
   }
+
+  // Portrait border
+  ctx.strokeStyle = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(portraitX, portraitY, portraitW, portraitH);
 }
 
 function drawPlayerBullets() {
