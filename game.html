@@ -329,6 +329,18 @@ let bossDamageFlash = 0;
 // Player weapon type (normal | laser)
 let playerWeapon = 'normal';
 
+// Half-heart HP system for boss fight (max = lives * 2)
+let playerHP = 6;
+const MAX_HP = 6; // 3 hearts * 2
+
+// Laser warning system
+let laserWarnings = []; // { y, timer, duration }
+const LASER_WARN_DURATION = 1500; // ms warning before firing
+
+// Boss entrance animation
+let bossEntranceY = -BOSS_HEIGHT; // starts above screen
+let bossEntranceDone = false;
+
 let targetGapY = H / 2;
 let lastPipeGapY = H / 2;
 let pipeSpawnTimerMs = 0;
@@ -378,6 +390,10 @@ function resetGame() {
   activeEffects = { bulletTime: 0, laserWeapon: 0, bulletSplit: 0, bulletTracking: 0 };
   bossDamageFlash = 0;
   playerWeapon = 'normal';
+  playerHP = MAX_HP;
+  laserWarnings = [];
+  bossEntranceY = -BOSS_HEIGHT;
+  bossEntranceDone = false;
 }
 
 resetGame();
@@ -415,7 +431,7 @@ function handleCanvasClick(e) {
   const my = (e.clientY - rect.top) * scaleY;
 
   // Boss dialogue — click to advance
-  if (bossPhase === 'dialogue' || bossPhase === 'victory') {
+  if (bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat') {
     handleBossDialogueAdvance();
     return;
   }
@@ -505,14 +521,14 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'ArrowUp') {
     e.preventDefault();
     // Boss dialogue — space to advance
-    if (bossPhase === 'dialogue' || bossPhase === 'victory') {
+    if (bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat') {
       handleBossDialogueAdvance();
     } else {
       handleFlap();
     }
   }
   if (e.code === 'Enter' || e.code === 'KeyZ') {
-    if (bossPhase === 'dialogue' || bossPhase === 'victory') handleBossDialogueAdvance();
+    if (bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat') handleBossDialogueAdvance();
   }
   if (e.code === 'KeyM') { muted = !muted; bgm.muted = muted; }
   if (e.code === 'KeyL') { showLeaderboard = !showLeaderboard; if (showLeaderboard) fetchLeaderboard(); }
@@ -697,8 +713,31 @@ function drawScore() {
 
 function drawLives() {
   ctx.fillStyle = '#FF4444';
-  for (let i = 0; i < lives; i++) {
-    drawPixelHeart(10 + i * 24, 10, 16);
+  if (bossPhase === 'fight' || bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat' || bossPhase === 'clearing') {
+    // Boss fight: show half-hearts based on playerHP
+    const maxHearts = MAX_HP / 2;
+    for (let i = 0; i < maxHearts; i++) {
+      const hpForThisHeart = Math.max(0, Math.min(2, playerHP - i * 2));
+      if (hpForThisHeart >= 2) {
+        // Full heart
+        ctx.fillStyle = '#FF4444';
+        drawPixelHeart(10 + i * 24, 10, 16);
+      } else if (hpForThisHeart === 1) {
+        // Half heart — draw outline + left half filled
+        ctx.fillStyle = '#444';
+        drawPixelHeart(10 + i * 24, 10, 16);
+        ctx.fillStyle = '#FF4444';
+        ctx.fillRect(10 + i * 24 + 3, 10 + 2, 5, 12);
+      } else {
+        // Empty heart
+        ctx.fillStyle = '#444';
+        drawPixelHeart(10 + i * 24, 10, 16);
+      }
+    }
+  } else {
+    for (let i = 0; i < lives; i++) {
+      drawPixelHeart(10 + i * 24, 10, 16);
+    }
   }
 }
 
@@ -769,7 +808,7 @@ function update(dt) {
     const dtFactor = (dt / MS_PER_FRAME) * GAME_SPEED;
 
     // Freeze bird during dialogue/victory phases
-    if (bossPhase === 'dialogue' || bossPhase === 'victory') {
+    if (bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat') {
       bird.y = H / 2;
       bird.vy = 0;
       bird.rotation = 0;
@@ -972,17 +1011,26 @@ function die(noLifeLoss) {
 function updateBoss(dt, dtFactor) {
   if (bossPhase === 'none') return;
 
-  // WARNING phase — show banner for 2.5 seconds
+  // WARNING phase — show banner, move bird to center, boss descends
   if (bossPhase === 'warning') {
     bossWarningTimer += dt;
-    if (bossWarningTimer >= 2500) {
+    // Smoothly move bird to center
+    const targetY = H / 2;
+    bird.y += (targetY - bird.y) * 0.08 * dtFactor;
+    bird.vy = 0;
+    bird.rotation = 0;
+    if (bossWarningTimer >= 3000) {
       bossPhase = 'clearing';
+      bird.y = H / 2;
     }
     return;
   }
 
-  // Clearing phase — wait for all pipes to leave screen
+  // Clearing phase — wait for all pipes to leave screen, lock bird
   if (bossPhase === 'clearing') {
+    bird.y = H / 2;
+    bird.vy = 0;
+    bird.rotation = 0;
     if (pipes.length === 0) {
       bossPhase = 'dialogue';
       bossDialogueIndex = 0;
@@ -991,6 +1039,9 @@ function updateBoss(dt, dtFactor) {
       bossDialogueFullText = '';
       bossDialogueDisplayedText = '';
       bossDialogueAdvanceReady = false;
+      // Initialize boss for entrance animation
+      bossEntranceY = -BOSS_HEIGHT;
+      bossEntranceDone = false;
     }
     return;
   }
@@ -1000,17 +1051,19 @@ function updateBoss(dt, dtFactor) {
     if (!bossDialogue) return; // wait for JSON load
     const scenes = bossDialogue.scenes;
     if (bossDialogueIndex >= scenes.length) {
-      // Dialogue done — start fight
+      // Dialogue done — start fight with entrance animation
       bossPhase = 'fight';
+      bossEntranceY = -BOSS_HEIGHT;
+      bossEntranceDone = false;
       boss = {
         x: W - BOSS_WIDTH / 2 - 20,
-        y: H / 2,
+        y: -BOSS_HEIGHT,
         hp: BOSS_MAX_HP,
         maxHp: BOSS_MAX_HP,
         timer: 0,
         attackTimer: 0,
         moveTimer: 0,
-        moveDir: -1,
+        moveDir: 1,
         attackPattern: 0,
       };
       playerBullets = [];
@@ -1018,6 +1071,8 @@ function updateBoss(dt, dtFactor) {
       powerUps = [];
       playerShootTimer = 0;
       powerUpSpawnTimer = 0;
+      laserWarnings = [];
+      playerHP = MAX_HP;
       activeEffects = { bulletTime: 0, laserWeapon: 0, bulletSplit: 0, bulletTracking: 0 };
       playerWeapon = 'normal';
       return;
@@ -1066,39 +1121,42 @@ function updateBoss(dt, dtFactor) {
       playerWeapon = 'normal';
     }
 
-    // Boss movement — sinusoidal up/down
-    const moveSpeed = 1.2 + Math.sin(boss.timer * 0.0008) * 0.5;
-    boss.y += moveSpeed * boss.moveDir * dtFactor * btFactor;
-    if (boss.y < BOSS_HEIGHT / 2 + 60) { boss.y = BOSS_HEIGHT / 2 + 60; boss.moveDir = 1; }
-    if (boss.y > H - BOSS_HEIGHT / 2 - 50) { boss.y = H - BOSS_HEIGHT / 2 - 50; boss.moveDir = -1; }
-    // Occasionally reverse direction randomly
-    if (boss.moveTimer > 1500 + Math.random() * 2000) {
-      boss.moveDir *= -1;
-      boss.moveTimer = 0;
+    // Boss entrance animation — descend from top
+    if (!bossEntranceDone) {
+      boss.y += 2.5 * dtFactor;
+      if (boss.y >= H / 2) {
+        boss.y = H / 2;
+        bossEntranceDone = true;
+      }
+    } else {
+      // Boss movement — sinusoidal up/down
+      const moveSpeed = 1.2 + Math.sin(boss.timer * 0.0008) * 0.5;
+      boss.y += moveSpeed * boss.moveDir * dtFactor * btFactor;
+      if (boss.y < BOSS_HEIGHT / 2 + 60) { boss.y = BOSS_HEIGHT / 2 + 60; boss.moveDir = 1; }
+      if (boss.y > H - BOSS_HEIGHT / 2 - 50) { boss.y = H - BOSS_HEIGHT / 2 - 50; boss.moveDir = -1; }
+      // Occasionally reverse direction randomly
+      if (boss.moveTimer > 1500 + Math.random() * 2000) {
+        boss.moveDir *= -1;
+        boss.moveTimer = 0;
+      }
     }
 
-    // Boss attacks
-    const attackInterval = 800;
-    if (boss.attackTimer >= attackInterval) {
+    // Boss attacks — only fire after entrance done, reduced frequency
+    if (!bossEntranceDone) { boss.attackTimer = 0; }
+    const attackInterval = 2500;
+    if (boss.attackTimer >= attackInterval && bossEntranceDone) {
       boss.attackTimer = 0;
       boss.attackPattern = (boss.attackPattern + 1) % 3;
       if (boss.attackPattern === 0) {
-        // Laser beam — horizontal line warning then fire
-        bossProjectiles.push({
-          x: boss.x - BOSS_WIDTH / 2,
-          y: boss.y,
-          vx: -6,
-          vy: 0,
-          type: 'laser',
-          size: 8,
-          life: 2000,
-        });
+        // Laser beam — first show warning line, then fire
+        const warnY = boss.y;
+        laserWarnings.push({ y: warnY, timer: 0, duration: LASER_WARN_DURATION, fired: false });
       } else if (boss.attackPattern === 1) {
-        // Diamond bullets — aimed at player
+        // Diamond bullets — aimed at player (slower)
         const dx = bird.x - boss.x;
         const dy = bird.y - boss.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const spd = 3.5;
+        const spd = 2.0;
         bossProjectiles.push({
           x: boss.x - BOSS_WIDTH / 2,
           y: boss.y,
@@ -1106,33 +1164,42 @@ function updateBoss(dt, dtFactor) {
           vy: (dy / dist) * spd,
           type: 'diamond',
           size: 10,
-          life: 4000,
-        });
-        // Second diamond slightly offset
-        bossProjectiles.push({
-          x: boss.x - BOSS_WIDTH / 2,
-          y: boss.y - 20,
-          vx: (dx / dist) * spd * 0.9,
-          vy: (dy / dist) * spd * 0.9 - 0.5,
-          type: 'diamond',
-          size: 8,
-          life: 4000,
+          life: 5000,
         });
       } else {
-        // Spread diamonds
-        for (let i = -2; i <= 2; i++) {
+        // Spread diamonds (slower)
+        for (let i = -1; i <= 1; i++) {
           bossProjectiles.push({
             x: boss.x - BOSS_WIDTH / 2,
             y: boss.y,
-            vx: -4,
-            vy: i * 1.2,
+            vx: -2.5,
+            vy: i * 0.8,
             type: 'diamond',
             size: 8,
-            life: 3000,
+            life: 4000,
           });
         }
       }
     }
+
+    // Update laser warnings
+    for (let w of laserWarnings) {
+      w.timer += dt * btFactor;
+      if (w.timer >= w.duration && !w.fired) {
+        w.fired = true;
+        // Fire the actual laser
+        bossProjectiles.push({
+          x: boss.x - BOSS_WIDTH / 2,
+          y: w.y,
+          vx: -5,
+          vy: 0,
+          type: 'laser',
+          size: 10,
+          life: 1500,
+        });
+      }
+    }
+    laserWarnings = laserWarnings.filter(w => w.timer < w.duration + 1600);
 
     // Player auto-shooting
     playerShootTimer += dt;
@@ -1267,7 +1334,7 @@ function updateBoss(dt, dtFactor) {
       }
     }
 
-    // Boss projectiles hit player
+    // Boss projectiles hit player (half-heart HP system)
     if (invincibleTimerMs <= 0) {
       for (let i = bossProjectiles.length - 1; i >= 0; i--) {
         const p = bossProjectiles[i];
@@ -1275,10 +1342,25 @@ function updateBoss(dt, dtFactor) {
         if (Math.abs(p.x - bird.x) < hitSize + BIRD_SIZE * 0.6 &&
             Math.abs(p.y - bird.y) < hitSize + BIRD_SIZE * 0.6) {
           bossProjectiles.splice(i, 1);
-          speedBonus = 0;
-          scoreSinceReset = 0;
-          speedLines = [];
-          die(false);
+          const dmg = p.type === 'laser' ? 2 : 1; // laser=1 heart, diamond=half heart
+          playerHP -= dmg;
+          hitSound();
+          if (playerHP <= 0) {
+            playerHP = 0;
+            // Enter defeat dialogue instead of immediate death
+            bossPhase = 'defeat';
+            bossDialogueIndex = 0;
+            bossDialogueLineIndex = 0;
+            bossDialogueCharTimer = 0;
+            bossDialogueFullText = '';
+            bossDialogueDisplayedText = '';
+            bossDialogueAdvanceReady = false;
+            bossProjectiles = [];
+            playerBullets = [];
+          } else {
+            invincibleTimerMs = INVINCIBLE_MS;
+            bird.vy = FLAP;
+          }
           break;
         }
       }
@@ -1305,14 +1387,30 @@ function updateBoss(dt, dtFactor) {
     }
     powerUps = powerUps.filter(pu => pu.y < H + 20);
 
-    // Power-up collection
+    // Power-up collection (by bird touch OR player bullet hit)
     for (let i = powerUps.length - 1; i >= 0; i--) {
       const pu = powerUps[i];
+      let collected = false;
+      // Bird touch
       if (Math.abs(pu.x - bird.x) < pu.size + BIRD_SIZE &&
           Math.abs(pu.y - bird.y) < pu.size + BIRD_SIZE) {
+        collected = true;
+      }
+      // Player bullet hit
+      if (!collected) {
+        for (let j = playerBullets.length - 1; j >= 0; j--) {
+          const b = playerBullets[j];
+          if (Math.abs(pu.x - b.x) < pu.size + b.size &&
+              Math.abs(pu.y - b.y) < pu.size + b.size) {
+            collected = true;
+            playerBullets.splice(j, 1);
+            break;
+          }
+        }
+      }
+      if (collected) {
         powerUps.splice(i, 1);
         applyPowerUp(pu.type);
-        // Collection particles
         for (let k = 0; k < 8; k++) {
           particles.push({
             x: pu.x, y: pu.y,
@@ -1336,6 +1434,27 @@ function updateBoss(dt, dtFactor) {
     if (!bossDialogue) return;
     const victory = bossDialogue.victory;
     const fullLine = victory.lines[bossDialogueLineIndex] || '';
+    if (bossDialogueFullText !== fullLine) {
+      bossDialogueFullText = fullLine;
+      bossDialogueDisplayedText = '';
+      bossDialogueCharTimer = 0;
+      bossDialogueAdvanceReady = false;
+    }
+    bossDialogueCharTimer += dt;
+    const charsToShow = Math.floor(bossDialogueCharTimer / 50);
+    if (charsToShow >= fullLine.length) {
+      bossDialogueDisplayedText = fullLine;
+      bossDialogueAdvanceReady = true;
+    } else {
+      bossDialogueDisplayedText = fullLine.substring(0, charsToShow);
+    }
+  }
+
+  // Defeat dialogue phase
+  if (bossPhase === 'defeat') {
+    if (!bossDialogue) return;
+    const defeat = bossDialogue.defeat;
+    const fullLine = defeat.lines[bossDialogueLineIndex] || '';
     if (bossDialogueFullText !== fullLine) {
       bossDialogueFullText = fullLine;
       bossDialogueDisplayedText = '';
@@ -1387,6 +1506,30 @@ function handleBossDialogueAdvance() {
       playerBullets = [];
       powerUps = [];
       // Continue playing with increased score milestones
+    }
+    bossDialogueCharTimer = 0;
+    bossDialogueFullText = '';
+    bossDialogueAdvanceReady = false;
+  } else if (bossPhase === 'defeat') {
+    if (!bossDialogueAdvanceReady) {
+      bossDialogueDisplayedText = bossDialogueFullText;
+      bossDialogueAdvanceReady = true;
+      return;
+    }
+    const defeat = bossDialogue.defeat;
+    bossDialogueLineIndex++;
+    if (bossDialogueLineIndex >= defeat.lines.length) {
+      // Defeat dialogue done — trigger actual death
+      bossPhase = 'none';
+      boss = null;
+      gameState = 'dead';
+      deadTimerMs = 0;
+      speedBonus = 0;
+      scoreSinceReset = 0;
+      speedLines = [];
+      if (score > bestScore) bestScore = score;
+      fetchLeaderboard();
+      setTimeout(showNameInput, 500);
     }
     bossDialogueCharTimer = 0;
     bossDialogueFullText = '';
@@ -1695,6 +1838,11 @@ function drawBossDialogue() {
     speaker = victory.speaker;
     speakerName = victory.speaker_name;
     text = bossDialogueDisplayedText;
+  } else if (bossPhase === 'defeat') {
+    const defeat = bossDialogue.defeat;
+    speaker = defeat.speaker;
+    speakerName = defeat.speaker_name;
+    text = bossDialogueDisplayedText;
   } else {
     return;
   }
@@ -1782,6 +1930,22 @@ function drawPlayerBullets() {
       ctx.fillStyle = '#AADDFF';
       ctx.fillRect(px + 2, py - 1, b.size, 2);
     }
+  }
+}
+
+function drawLaserWarnings() {
+  for (let w of laserWarnings) {
+    const progress = w.timer / w.duration;
+    const alpha = 0.15 + progress * 0.35; // gets brighter as it approaches firing
+    const flash = Math.floor(now / 100) % 2 === 0;
+    ctx.globalAlpha = flash ? alpha : alpha * 0.5;
+    // Warning red line across full width
+    ctx.fillStyle = '#FF0000';
+    ctx.fillRect(0, w.y - 2, W, 4);
+    // Glow effect
+    ctx.fillStyle = 'rgba(255,0,0,0.1)';
+    ctx.fillRect(0, w.y - 10, W, 20);
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -1907,7 +2071,8 @@ function draw() {
   if (bossPhase === 'warning') {
     drawBossWarning();
   }
-  if (bossPhase === 'fight' || bossPhase === 'victory') {
+  if (bossPhase === 'fight' || bossPhase === 'victory' || bossPhase === 'defeat') {
+    drawLaserWarnings();
     drawBossProjectiles();
     drawPowerUps();
     drawPlayerBullets();
@@ -1915,7 +2080,7 @@ function draw() {
     drawBossHPBar();
     drawActiveEffectsUI();
   }
-  if (bossPhase === 'dialogue' || bossPhase === 'victory') {
+  if (bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat' || bossPhase === 'defeat') {
     drawBossDialogue();
   }
 

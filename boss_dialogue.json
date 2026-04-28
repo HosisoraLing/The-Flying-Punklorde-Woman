@@ -30,12 +30,22 @@
       ]
     },
     {
+      "id": "puppet_chant",
+      "speaker": "herta",
+      "speaker_name": "黑塔人偶们",
+      "lines": [
+        "黑塔女士！举世无双！",
+        "黑塔女士！聪明绝顶！",
+        "黑塔女士！沉鱼落雁！"
+      ]
+    },
+    {
       "id": "silverwolf_challenge",
       "speaker": "silverwolf",
       "speaker_name": "银狼",
       "lines": [
-        "来啊！让我看看你有什么本事！",
-        "这次不会再输了！"
+        "够了够了，受不了这尬吹……",
+        "来吧，让我看看你有什么本事！"
       ]
     }
   ],
