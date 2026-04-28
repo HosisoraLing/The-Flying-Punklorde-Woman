@@ -1919,7 +1919,7 @@ function draw() {
     drawBossDialogue();
   }
 
-  drawScore();
+  if (bossPhase !== 'fight' && bossPhase !== 'dialogue' && bossPhase !== 'victory' && bossPhase !== 'warning' && bossPhase !== 'clearing') drawScore();
   drawLives();
   drawSpeedIndicator();
 
