@@ -2145,21 +2145,12 @@ function drawBossDialogue() {
   const portraitH = speaker === 'herta' ? 160 : (speaker === 'puppet' ? 100 : 80);
   const portraitY = boxY - portraitH - 20;
 
-  // Portrait background glow
-  ctx.save();
-  ctx.globalAlpha = 0.2;
-  ctx.shadowColor = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
-
   if (speaker === 'puppet') {
     // Show 5 puppets in a row
     const puppetCount = 5;
     const singleW = 70;
     const totalW = puppetCount * singleW + (puppetCount - 1) * 8;
     const startX = W / 2 - totalW / 2;
-    ctx.fillRect(startX - 4, portraitY - 4, totalW + 8, portraitH + 8);
-    ctx.restore();
     for (let i = 0; i < puppetCount; i++) {
       const px = startX + i * (singleW + 8);
       ctx.drawImage(puppetImg, px, portraitY, singleW, portraitH);
@@ -2167,8 +2158,6 @@ function drawBossDialogue() {
   } else {
     const portraitW = speaker === 'herta' ? 140 : 80;
     const portraitX = W / 2 - portraitW / 2;
-    ctx.fillRect(portraitX - 4, portraitY - 4, portraitW + 8, portraitH + 8);
-    ctx.restore();
     if (speaker === 'herta') {
       ctx.drawImage(bossImg, portraitX, portraitY, portraitW, portraitH);
     } else {
