@@ -248,6 +248,10 @@ birdImg.src = 'sliver_wolf_lv999.png';
 const bossImg = new Image();
 bossImg.src = 'The_Herta_Boss.png';
 
+// Herta puppet sprite
+const puppetImg = new Image();
+puppetImg.src = 'herta_figure.png';
+
 // Boss dialogue JSON
 let bossDialogue = null;
 fetch('boss_dialogue.json').then(r => r.json()).then(d => { bossDialogue = d; }).catch(() => {});
@@ -337,6 +341,18 @@ const MAX_HP = 6; // 3 hearts * 2
 let laserWarnings = []; // { y, timer, duration }
 const LASER_WARN_DURATION = 1500; // ms warning before firing
 
+// Player laser beam (continuous beam when laser weapon active)
+let playerLaserActive = false;
+let playerLaserHitTimer = 0;
+
+// Herta puppets
+let puppets = []; // { x, y, vy, hp, timer, attackTimer, moveDir }
+const PUPPET_WIDTH = 50;
+const PUPPET_HEIGHT = 60;
+const PUPPET_SPAWN_INTERVAL = 8000; // ms
+const PUPPET_MAX = 2;
+let puppetSpawnTimer = 0;
+
 // Boss entrance animation
 let bossEntranceY = -BOSS_HEIGHT; // starts above screen
 let bossEntranceDone = false;
@@ -394,6 +410,10 @@ function resetGame() {
   laserWarnings = [];
   bossEntranceY = -BOSS_HEIGHT;
   bossEntranceDone = false;
+  puppets = [];
+  puppetSpawnTimer = 0;
+  playerLaserActive = false;
+  playerLaserHitTimer = 0;
 }
 
 resetGame();
@@ -1182,42 +1202,54 @@ function updateBoss(dt, dtFactor) {
       }
     }
 
-    // Update laser warnings
+    // Update laser warnings — after warning, fire stationary beam at fixed Y
     for (let w of laserWarnings) {
       w.timer += dt * btFactor;
       if (w.timer >= w.duration && !w.fired) {
         w.fired = true;
-        // Fire the actual laser
-        bossProjectiles.push({
-          x: boss.x - BOSS_WIDTH / 2,
-          y: w.y,
-          vx: -5,
-          vy: 0,
-          type: 'laser',
-          size: 10,
-          life: 1500,
-        });
+        w.fireTime = 0;
+      }
+      // Active laser beam
+      if (w.fired) {
+        w.fireTime += dt * btFactor;
+        // Hit player during active beam (1000ms duration)
+        if (w.fireTime <= 1000 && invincibleTimerMs <= 0) {
+          const beamLeft = 0;
+          const beamRight = w.source === 'puppet' ? 300 : (boss ? boss.x - BOSS_WIDTH / 2 : W);
+          if (bird.x > beamLeft && bird.x < beamRight &&
+              Math.abs(bird.y - w.y) < 12 + BIRD_SIZE * 0.5) {
+            playerHP -= 2; // laser = 1 heart
+            hitSound();
+            if (playerHP <= 0) {
+              playerHP = 0;
+              bossPhase = 'defeat';
+              bossDialogueIndex = 0;
+              bossDialogueLineIndex = 0;
+              bossDialogueCharTimer = 0;
+              bossDialogueFullText = '';
+              bossDialogueDisplayedText = '';
+              bossDialogueAdvanceReady = false;
+              bossProjectiles = [];
+              playerBullets = [];
+              puppets = [];
+              laserWarnings = [];
+            } else {
+              invincibleTimerMs = INVINCIBLE_MS;
+              bird.vy = FLAP;
+            }
+          }
+        }
       }
     }
-    laserWarnings = laserWarnings.filter(w => w.timer < w.duration + 1600);
+    laserWarnings = laserWarnings.filter(w => !w.fired || w.fireTime < 1200);
 
     // Player auto-shooting
-    playerShootTimer += dt;
-    const shootInterval = activeEffects.bulletSplit > 0 ? PLAYER_SHOOT_INTERVAL * 1.2 : PLAYER_SHOOT_INTERVAL;
-    if (playerShootTimer >= shootInterval) {
-      playerShootTimer = 0;
-      if (playerWeapon === 'laser') {
-        // Laser weapon — big beam
-        playerBullets.push({
-          x: bird.x + BIRD_SIZE,
-          y: bird.y,
-          vx: 10,
-          vy: 0,
-          type: 'laser',
-          size: 12,
-          life: 1500,
-        });
-      } else {
+    playerLaserActive = playerWeapon === 'laser';
+    if (!playerLaserActive) {
+      playerShootTimer += dt;
+      const shootInterval = activeEffects.bulletSplit > 0 ? PLAYER_SHOOT_INTERVAL * 1.2 : PLAYER_SHOOT_INTERVAL;
+      if (playerShootTimer >= shootInterval) {
+        playerShootTimer = 0;
         // Normal ray bullet
         playerBullets.push({
           x: bird.x + BIRD_SIZE,
@@ -1232,7 +1264,7 @@ function updateBoss(dt, dtFactor) {
         if (activeEffects.bulletSplit > 0) {
           playerBullets.push({
             x: bird.x + BIRD_SIZE,
-            y: bird.y,
+            y: bird.y - 8,
             vx: 6.5,
             vy: -1.5,
             type: 'split',
@@ -1241,7 +1273,7 @@ function updateBoss(dt, dtFactor) {
           });
           playerBullets.push({
             x: bird.x + BIRD_SIZE,
-            y: bird.y,
+            y: bird.y + 8,
             vx: 6.5,
             vy: 1.5,
             type: 'split',
@@ -1250,6 +1282,84 @@ function updateBoss(dt, dtFactor) {
           });
         }
       }
+    }
+
+    // Player laser beam — continuous damage to boss/puppets
+    if (playerLaserActive && boss && bossEntranceDone) {
+      playerLaserHitTimer += dt;
+      if (playerLaserHitTimer >= 100) { // damage every 100ms
+        playerLaserHitTimer = 0;
+        // Check if laser hits boss
+        const bossLeft = boss.x - BOSS_WIDTH / 2;
+        const bossTop = boss.y - BOSS_HEIGHT / 2;
+        const bossBottom = boss.y + BOSS_HEIGHT / 2;
+        if (bird.y > bossTop - 10 && bird.y < bossBottom + 10) {
+          boss.hp -= 3;
+          bossDamageFlash = 80;
+          for (let k = 0; k < 2; k++) {
+            particles.push({
+              x: bossLeft, y: bird.y,
+              vx: (Math.random() - 0.5) * 2,
+              vy: (Math.random() - 0.5) * 2,
+              size: 3 + Math.random() * 3,
+              life: 1,
+              decay: 0.03,
+              color: 'rgba(0,200,255,0.9)',
+            });
+          }
+          if (boss.hp <= 0) {
+            boss.hp = 0;
+            bossPhase = 'victory';
+            bossDialogueIndex = 0;
+            bossDialogueLineIndex = 0;
+            bossDialogueCharTimer = 0;
+            bossDialogueFullText = '';
+            bossDialogueDisplayedText = '';
+            bossDialogueAdvanceReady = false;
+            bossProjectiles = [];
+            puppets = [];
+            laserWarnings = [];
+            for (let k = 0; k < 40; k++) {
+              const angle = (k / 40) * Math.PI * 2;
+              particles.push({
+                x: boss.x, y: boss.y,
+                vx: Math.cos(angle) * (2 + Math.random() * 3),
+                vy: Math.sin(angle) * (2 + Math.random() * 3),
+                size: 6 + Math.random() * 6,
+                life: 1,
+                decay: 0.008 + Math.random() * 0.008,
+                color: `hsl(${Math.random() * 60 + 300}, 100%, 70%)`,
+              });
+            }
+            scoreSound();
+          }
+        }
+        // Check if laser hits puppets
+        for (let j = puppets.length - 1; j >= 0; j--) {
+          const p = puppets[j];
+          if (bird.y > p.y - PUPPET_HEIGHT / 2 - 10 && bird.y < p.y + PUPPET_HEIGHT / 2 + 10 &&
+              bird.x < p.x) {
+            p.hp -= 3;
+            if (p.hp <= 0) {
+              for (let k = 0; k < 12; k++) {
+                particles.push({
+                  x: p.x, y: p.y,
+                  vx: (Math.random() - 0.5) * 4,
+                  vy: (Math.random() - 0.5) * 4,
+                  size: 4 + Math.random() * 4,
+                  life: 1,
+                  decay: 0.015,
+                  color: `hsl(${Math.random() * 60 + 300}, 80%, 60%)`,
+                });
+              }
+              puppets.splice(j, 1);
+              scoreSound();
+            }
+          }
+        }
+      }
+    } else {
+      playerLaserHitTimer = 0;
     }
 
     // Update player bullets
@@ -1315,6 +1425,8 @@ function updateBoss(dt, dtFactor) {
           bossDialogueDisplayedText = '';
           bossDialogueAdvanceReady = false;
           bossProjectiles = [];
+          puppets = [];
+          laserWarnings = [];
           // Victory particles explosion
           for (let k = 0; k < 40; k++) {
             const angle = (k / 40) * Math.PI * 2;
@@ -1357,6 +1469,8 @@ function updateBoss(dt, dtFactor) {
             bossDialogueAdvanceReady = false;
             bossProjectiles = [];
             playerBullets = [];
+            puppets = [];
+            laserWarnings = [];
           } else {
             invincibleTimerMs = INVINCIBLE_MS;
             bird.vy = FLAP;
@@ -1424,6 +1538,92 @@ function updateBoss(dt, dtFactor) {
         }
       }
     }
+
+    // Puppet spawning
+    if (bossEntranceDone) {
+      puppetSpawnTimer += dt;
+      if (puppetSpawnTimer >= PUPPET_SPAWN_INTERVAL && puppets.length < PUPPET_MAX) {
+        puppetSpawnTimer = 0;
+        const py = 80 + Math.random() * (H - 200);
+        puppets.push({
+          x: W + PUPPET_WIDTH,
+          y: py,
+          vy: (Math.random() - 0.5) * 1.5,
+          hp: 15,
+          timer: 0,
+          attackTimer: 2000 + Math.random() * 1500, // stagger first attack
+          moveDir: Math.random() < 0.5 ? -1 : 1,
+        });
+      }
+    }
+
+    // Update puppets
+    for (let p of puppets) {
+      p.timer += dt;
+      p.attackTimer += dt * btFactor;
+      // Move left until x=300, then drift up/down
+      if (p.x > 300) {
+        p.x -= 1.5 * dtFactor;
+      } else {
+        p.y += p.vy * dtFactor * p.moveDir;
+        if (p.y < PUPPET_HEIGHT / 2 + 40) { p.y = PUPPET_HEIGHT / 2 + 40; p.moveDir = 1; }
+        if (p.y > H - PUPPET_HEIGHT / 2 - 50) { p.y = H - PUPPET_HEIGHT / 2 - 50; p.moveDir = -1; }
+        if (p.timer > 2000 + Math.random() * 2000) {
+          p.moveDir *= -1;
+          p.timer = 0;
+        }
+      }
+      // Puppet attacks — laser with warning
+      if (p.x <= 300 && p.attackTimer >= 3500) {
+        p.attackTimer = 0;
+        laserWarnings.push({ y: p.y, timer: 0, duration: LASER_WARN_DURATION, fired: false, source: 'puppet' });
+      }
+    }
+
+    // Player bullets hit puppets
+    for (let i = playerBullets.length - 1; i >= 0; i--) {
+      const b = playerBullets[i];
+      for (let j = puppets.length - 1; j >= 0; j--) {
+        const p = puppets[j];
+        if (Math.abs(b.x - p.x) < PUPPET_WIDTH / 2 + b.size &&
+            Math.abs(b.y - p.y) < PUPPET_HEIGHT / 2 + b.size) {
+          const dmg = b.type === 'laser' ? 5 : (b.type === 'split' ? 1 : 2);
+          p.hp -= dmg;
+          playerBullets.splice(i, 1);
+          for (let k = 0; k < 3; k++) {
+            particles.push({
+              x: b.x, y: b.y,
+              vx: (Math.random() - 0.5) * 2,
+              vy: (Math.random() - 0.5) * 2,
+              size: 3 + Math.random() * 3,
+              life: 1,
+              decay: 0.03,
+              color: 'rgba(100,180,255,0.8)',
+            });
+          }
+          if (p.hp <= 0) {
+            // Puppet destroyed
+            for (let k = 0; k < 12; k++) {
+              particles.push({
+                x: p.x, y: p.y,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                size: 4 + Math.random() * 4,
+                life: 1,
+                decay: 0.015,
+                color: `hsl(${Math.random() * 60 + 300}, 80%, 60%)`,
+              });
+            }
+            puppets.splice(j, 1);
+            scoreSound();
+          }
+          break;
+        }
+      }
+    }
+
+    // Remove off-screen puppets
+    puppets = puppets.filter(p => p.x > -PUPPET_WIDTH * 2);
 
     // Boss damage flash decay
     if (bossDamageFlash > 0) bossDamageFlash -= dt;
@@ -1505,6 +1705,8 @@ function handleBossDialogueAdvance() {
       bossProjectiles = [];
       playerBullets = [];
       powerUps = [];
+      puppets = [];
+      laserWarnings = [];
       // Continue playing with increased score milestones
     }
     bossDialogueCharTimer = 0;
@@ -1540,7 +1742,7 @@ function handleBossDialogueAdvance() {
 function applyPowerUp(type) {
   scoreSound();
   if (type === 'heart') {
-    if (lives < MAX_LIVES) lives++;
+    if (playerHP < MAX_HP) playerHP = Math.min(MAX_HP, playerHP + 2); // +1 heart
   } else if (type === 'bulletTime') {
     activeEffects.bulletTime = 6000;
   } else if (type === 'laser') {
@@ -1799,6 +2001,32 @@ function drawBossSprite() {
   ctx.restore();
 }
 
+function drawPuppets() {
+  for (let p of puppets) {
+    const px = Math.round(p.x / 2) * 2;
+    const py = Math.round(p.y / 2) * 2;
+    // Puppet glow
+    ctx.save();
+    ctx.globalAlpha = 0.15 + Math.sin(now * 0.004) * 0.1;
+    ctx.shadowColor = '#e94560';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#e94560';
+    ctx.fillRect(px - PUPPET_WIDTH / 2, py - PUPPET_HEIGHT / 2, PUPPET_WIDTH, PUPPET_HEIGHT);
+    ctx.restore();
+    // Puppet sprite
+    ctx.drawImage(puppetImg, px - PUPPET_WIDTH / 2, py - PUPPET_HEIGHT / 2, PUPPET_WIDTH, PUPPET_HEIGHT);
+    // HP bar under puppet
+    const barW = PUPPET_WIDTH;
+    const barH = 4;
+    const barX = px - barW / 2;
+    const barY = py + PUPPET_HEIGHT / 2 + 4;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#e94560';
+    ctx.fillRect(barX, barY, barW * (p.hp / 15), barH);
+  }
+}
+
 function drawBossHPBar() {
   if (!boss) return;
   // HP bar at top center
@@ -1904,18 +2132,32 @@ function drawBossDialogue() {
 }
 
 function drawPlayerBullets() {
+  // Continuous laser beam
+  if (playerLaserActive && boss) {
+    const beamEnd = boss.x - BOSS_WIDTH / 2;
+    const py = Math.round(bird.y / 2) * 2;
+    const flash = Math.floor(now / 50) % 2 === 0;
+    // Outer glow
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#00BFFF';
+    ctx.fillRect(bird.x + BIRD_SIZE, py - 10, beamEnd - bird.x - BIRD_SIZE, 20);
+    // Middle
+    ctx.globalAlpha = flash ? 0.5 : 0.35;
+    ctx.fillStyle = '#0088FF';
+    ctx.fillRect(bird.x + BIRD_SIZE, py - 4, beamEnd - bird.x - BIRD_SIZE, 8);
+    // Core
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#00DDFF';
+    ctx.fillRect(bird.x + BIRD_SIZE, py - 2, beamEnd - bird.x - BIRD_SIZE, 4);
+    // White center
+    ctx.fillStyle = '#AAEEFF';
+    ctx.fillRect(bird.x + BIRD_SIZE, py - 1, beamEnd - bird.x - BIRD_SIZE, 2);
+  }
+
   for (let b of playerBullets) {
     const px = Math.round(b.x / 2) * 2;
     const py = Math.round(b.y / 2) * 2;
-    if (b.type === 'laser') {
-      // Big blue laser beam
-      ctx.fillStyle = 'rgba(0,150,255,0.3)';
-      ctx.fillRect(px - 4, py - b.size, 20 + b.size * 2, b.size * 2);
-      ctx.fillStyle = '#00BFFF';
-      ctx.fillRect(px, py - b.size / 2, 16 + b.size, b.size);
-      ctx.fillStyle = '#FFF';
-      ctx.fillRect(px + 2, py - 2, 12, 4);
-    } else if (b.type === 'split') {
+    if (b.type === 'split') {
       // Smaller green-tinted bullet
       ctx.fillStyle = '#00FF88';
       ctx.fillRect(px - 2, py - 2, 6, 6);
@@ -1935,18 +2177,39 @@ function drawPlayerBullets() {
 
 function drawLaserWarnings() {
   for (let w of laserWarnings) {
-    const progress = w.timer / w.duration;
-    const alpha = 0.15 + progress * 0.35; // gets brighter as it approaches firing
-    const flash = Math.floor(now / 100) % 2 === 0;
-    ctx.globalAlpha = flash ? alpha : alpha * 0.5;
-    // Warning red line across full width
-    ctx.fillStyle = '#FF0000';
-    ctx.fillRect(0, w.y - 2, W, 4);
-    // Glow effect
-    ctx.fillStyle = 'rgba(255,0,0,0.1)';
-    ctx.fillRect(0, w.y - 10, W, 20);
-    ctx.globalAlpha = 1;
+    if (!w.fired) {
+      // Warning phase — red line that gets brighter
+      const progress = w.timer / w.duration;
+      const alpha = 0.15 + progress * 0.35;
+      const flash = Math.floor(now / 100) % 2 === 0;
+      ctx.globalAlpha = flash ? alpha : alpha * 0.5;
+      ctx.fillStyle = '#FF0000';
+      ctx.fillRect(0, w.y - 2, W, 4);
+      ctx.fillStyle = 'rgba(255,0,0,0.1)';
+      ctx.fillRect(0, w.y - 10, W, 20);
+      ctx.globalAlpha = 1;
+    } else if (w.fireTime <= 1000) {
+      // Active laser beam — solid red beam from left to source
+      const beamRight = w.source === 'puppet' ? 300 : (boss ? boss.x - BOSS_WIDTH / 2 : W);
+      const flash = Math.floor(now / 60) % 2 === 0;
+      // Outer glow
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = '#FF0000';
+      ctx.fillRect(0, w.y - 14, beamRight, 28);
+      // Middle layer
+      ctx.globalAlpha = flash ? 0.5 : 0.35;
+      ctx.fillStyle = '#FF4444';
+      ctx.fillRect(0, w.y - 6, beamRight, 12);
+      // Core beam
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#FF8888';
+      ctx.fillRect(0, w.y - 2, beamRight, 4);
+      // White center
+      ctx.fillStyle = '#FFCCCC';
+      ctx.fillRect(0, w.y - 1, beamRight, 2);
+    }
   }
+  ctx.globalAlpha = 1;
 }
 
 function drawBossProjectiles() {
@@ -2076,6 +2339,7 @@ function draw() {
     drawBossProjectiles();
     drawPowerUps();
     drawPlayerBullets();
+    drawPuppets();
     if (boss) drawBossSprite();
     drawBossHPBar();
     drawActiveEffectsUI();
