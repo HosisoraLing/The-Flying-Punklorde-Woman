@@ -301,7 +301,7 @@ let bossDialogueAdvanceReady = false;
 
 // Boss state
 let boss = null; // { x, y, hp, maxHp, phase, timer, attackTimer, moveTimer, moveDir }
-const BOSS_MAX_HP = 150;
+const BOSS_MAX_HP = 300;
 const BOSS_WIDTH = 120;
 const BOSS_HEIGHT = 140;
 
@@ -1150,7 +1150,7 @@ function updateBoss(dt, dtFactor) {
       }
     } else {
       // Boss movement — sinusoidal up/down
-      const moveSpeed = 1.2 + Math.sin(boss.timer * 0.0008) * 0.5;
+      const moveSpeed = 2.0 + Math.sin(boss.timer * 0.001) * 0.8;
       boss.y += moveSpeed * boss.moveDir * dtFactor * btFactor;
       if (boss.y < BOSS_HEIGHT / 2 + 60) { boss.y = BOSS_HEIGHT / 2 + 60; boss.moveDir = 1; }
       if (boss.y > H - BOSS_HEIGHT / 2 - 50) { boss.y = H - BOSS_HEIGHT / 2 - 50; boss.moveDir = -1; }
@@ -1990,15 +1990,6 @@ function drawBossSprite() {
   // Draw boss image
   ctx.drawImage(bossImg, bx, by, BOSS_WIDTH, BOSS_HEIGHT);
   ctx.globalAlpha = 1;
-
-  // Boss shadow/glow effect
-  ctx.save();
-  ctx.globalAlpha = 0.15 + Math.sin(now * 0.003) * 0.1;
-  ctx.shadowColor = '#e94560';
-  ctx.shadowBlur = 20;
-  ctx.fillStyle = '#e94560';
-  ctx.fillRect(bx, by, BOSS_WIDTH, BOSS_HEIGHT);
-  ctx.restore();
 }
 
 function drawPuppets() {
