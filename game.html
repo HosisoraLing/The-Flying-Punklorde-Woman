@@ -1644,6 +1644,10 @@ function updateBoss(dt, dtFactor) {
                 color: `hsl(${Math.random() * 60 + 300}, 80%, 60%)`,
               });
             }
+            // Cancel any laser warnings from this puppet
+            for (let w = laserWarnings.length - 1; w >= 0; w--) {
+              if (laserWarnings[w].ref === p) laserWarnings.splice(w, 1);
+            }
             puppets.splice(j, 1);
             scoreSound();
           }
