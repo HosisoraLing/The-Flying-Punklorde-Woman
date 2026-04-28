@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Flappy Bird 🐤</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  background: #1a1a2e;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-family: 'Press Start 2P', monospace, sans-serif;
+}
+canvas {
+  border: 3px solid #e94560;
+  border-radius: 8px;
+  box-shadow: 0 0 30px rgba(233,69,96,0.4), 0 0 60px rgba(233,69,96,0.2);
+  cursor: pointer;
+  image-rendering: pixelated;
+}
+@media (max-width: 500px) {
+  canvas {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+/* Intro overlay */
+#intro {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 20px;
+}
+#intro.hidden { display: none; }
+#intro .panel {
+  background: #1a1a2e;
+  border: 3px solid #e94560;
+  padding: 28px 24px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  -webkit-font-smoothing: none;
+}
+#intro h2 {
+  color: #FFD700;
+  font-size: 20px;
+  font-family: monospace;
+  margin-bottom: 16px;
+  text-shadow: 2px 2px 0 #a08000;
+}
+#intro p {
+  color: #ccc;
+  font-size: 13px;
+  font-family: monospace;
+  line-height: 1.8;
+  margin-bottom: 10px;
+  text-align: left;
+}
+#intro .highlight { color: #FFD700; }
+#intro .warn { color: #FF4444; }
+#intro .btn {
+  margin-top: 18px;
+  padding: 12px 32px;
+  background: #6C5CE7;
+  color: #fff;
+  border: 3px solid #5a4bd1;
+  font-size: 15px;
+  font-family: monospace;
+  cursor: pointer;
+  letter-spacing: 2px;
+  text-shadow: 2px 2px 0 #3a2ca0;
+  -webkit-font-smoothing: none;
+}
+#intro .btn:active { background: #5a4bd1; }
+
+/* Nickname input overlay */
+#nameInput {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 998;
+}
+#nameInput.show { display: flex; }
+#nameInput .panel {
+  background: #1a1a2e;
+  border: 3px solid #e94560;
+  padding: 24px 20px;
+  width: 300px;
+  text-align: center;
+}
+#nameInput h3 {
+  color: #FFD700;
+  font-size: 16px;
+  font-family: monospace;
+  margin-bottom: 12px;
+  -webkit-font-smoothing: none;
+}
+#nameInput input {
+  width: 100%;
+  padding: 10px;
+  font-size: 16px;
+  font-family: monospace;
+  background: #0a0a1a;
+  color: #FFF;
+  border: 2px solid #555;
+  outline: none;
+  text-align: center;
+  -webkit-font-smoothing: none;
+}
+#nameInput input:focus { border-color: #6C5CE7; }
+#nameInput .btn {
+  margin-top: 12px;
+  padding: 10px 28px;
+  background: #6C5CE7;
+  color: #fff;
+  border: 3px solid #5a4bd1;
+  font-size: 14px;
+  font-family: monospace;
+  cursor: pointer;
+  -webkit-font-smoothing: none;
+  text-shadow: 2px 2px 0 #3a2ca0;
+}
+#nameInput .btn:active { background: #5a4bd1; }
+#nameInput .msg {
+  margin-top: 8px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #FF4444;
+  min-height: 16px;
+}
+</style>
+</head>
+<body>
+<div id="intro">
+  <div class="panel">
+    <h2>飞翔的朋克洛德人</h2>
+    <p>
+      狼尊成功骇入了黑塔女士的宝库，<br>
+      拿回了被没收的<span class="highlight">游戏账号</span>！<br>
+      但警报已经响起，黑塔随时会回来——<br>
+      赶紧穿越庇尔波因特的夜空<span class="highlight">逃命</span>！
+    </p>
+    <p>
+      <span class="warn">规则：</span><br>
+      - 点击屏幕拍打翅膀，躲避大楼<br>
+      - <span class="highlight">前76根管道</span>碰到了不会扣命<br>
+      - 每得3分速度+10%，碰管道重置<br>
+      - 3条命，76层后每20分+1命（最多4条）<br>
+      - 76层后每40分最低速度+10%
+    </p>
+    <button class="btn" id="introStart">开始游戏</button>
+  </div>
+</div>
+<div id="nameInput">
+  <div class="panel">
+    <h3>提交分数</h3>
+    <input type="text" id="nameField" placeholder="输入昵称（1-8字）" maxlength="8" autocomplete="off">
+    <button class="btn" id="submitBtn">上榜</button>
+    <button class="btn" id="closeNameInput" style="background:#555;border-color:#444;margin-top:8px;">关闭</button>
+    <div class="msg" id="submitMsg"></div>
+  </div>
+</div>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// Responsive sizing
+const W = 400, H = 600;
+canvas.width = W;
+canvas.height = H;
+
+function resizeCanvas() {
+  const ratio = W / H;
+  let cw = window.innerWidth;
+  let ch = window.innerHeight;
+  if (cw / ch > ratio) {
+    cw = ch * ratio;
+  } else {
+    ch = cw / ratio;
+  }
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Audio context for sound effects
+let audioCtx;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playSound(freq, type, duration, vol=0.3) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+
+function flapSound() { playSound(600, 'square', 0.1, 0.2); }
+function scoreSound() { playSound(880, 'sine', 0.15, 0.3); setTimeout(() => playSound(1100, 'sine', 0.2, 0.3), 100); }
+function hitSound() { playSound(200, 'sawtooth', 0.3, 0.4); setTimeout(() => playSound(100, 'sawtooth', 0.4, 0.3), 150); }
+
+// BGM
+const bgm = new Audio('bgm.mp3');
+bgm.loop = true;
+bgm.volume = 0.3;
+let bgmStarted = false;
+function startBGM() {
+  if (!bgmStarted) {
+    bgm.play().catch(() => {});
+    bgmStarted = true;
+  }
+}
+
+// Bird sprite
+const birdImg = new Image();
+birdImg.src = 'sliver_wolf_lv999.png';
+
+// Game state — all timing in milliseconds
+const GRAVITY = 0.14;       // per-frame normalized (see dtFactor)
+const FLAP = -3.7;          // per-frame normalized
+const PIPE_WIDTH = 60;
+const PIPE_GAP = 170;
+const PIPE_SPEED = 2.2;     // per-frame normalized
+const BIRD_SIZE = 20;
+const MS_PER_FRAME = 16.67; // 60fps baseline for physics normalization
+const GAME_SPEED = 1.4;     // overall speed multiplier
+
+// Timers in milliseconds
+const INVINCIBLE_MS = 3000;
+const DEAD_DELAY_MS = 500;
+const PIPE_BASE_INTERVAL_MS = 1100;   // ~66 frames
+const PIPE_EXTRA_INTERVAL_MS = 1000;  // ~60 frames max extra
+const PIPE_MAX_INTERVAL_MS = 2200;    // max gap between pipes
+
+let bird, pipes, score, bestScore = 0, gameState;
+let scoreSubmitted = false;
+let lastSubmittedName = '';
+const MAX_LIVES = 4;
+const INITIAL_LIVES = 3;
+let lives, invincibleTimerMs;
+let speedBonus = 0; // 0–300, percentage bonus on pipe speed
+let scoreSinceReset = 0; // points gained since last speed reset
+let minSpeedMultiplier = 1.0; // minimum speed multiplier after 76 pipes
+let maxSpeedBonus = 300; // maximum speed bonus
+let particles = [];
+let speedLines = [];
+let muted = false;
+let countdownMs = 0; // countdown before resume
+let showLeaderboard = false;
+
+let targetGapY = H / 2;
+let lastPipeGapY = H / 2;
+let pipeSpawnTimerMs = 0;
+let pipeSpawnIntervalMs = PIPE_BASE_INTERVAL_MS;
+
+// Timing
+let lastTime = 0;
+let now = 0;       // total elapsed ms
+let deadTimerMs = 0;
+
+function resetGame() {
+  bird = { x: 80, y: H / 2, vy: 0, rotation: 0 };
+  pipes = [];
+  score = 0;
+  gameState = 'ready';
+  targetGapY = H / 2;
+  lastPipeGapY = H / 2;
+  pipeSpawnTimerMs = 0;
+  pipeSpawnIntervalMs = PIPE_BASE_INTERVAL_MS;
+  lives = INITIAL_LIVES;
+  invincibleTimerMs = 0;
+  deadTimerMs = 0;
+  speedBonus = 0;
+  scoreSinceReset = 0;
+  minSpeedMultiplier = 1.0;
+  maxSpeedBonus = 300;
+  particles = [];
+  speedLines = [];
+  countdownMs = 0;
+  scoreSubmitted = false;
+  lastSubmittedName = '';
+}
+
+resetGame();
+
+// Input
+function handleFlap() {
+  initAudio();
+  startBGM();
+  if (gameState === 'ready') {
+    gameState = 'playing';
+    bird.vy = FLAP;
+    flapSound();
+  } else if (gameState === 'playing') {
+    bird.vy = FLAP;
+    flapSound();
+  } else if (gameState === 'dead' && deadTimerMs > DEAD_DELAY_MS && !nameInputEl.classList.contains('show')) {
+    resetGame();
+  }
+}
+
+function handleCanvasClick(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = W / rect.width;
+  const scaleY = H / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  // Pause button hit
+  if (mx >= PAUSE_BTN.x && mx <= PAUSE_BTN.x + BTN_SIZE &&
+      my >= PAUSE_BTN.y && my <= PAUSE_BTN.y + BTN_SIZE) {
+    if (gameState === 'playing') {
+      gameState = 'paused';
+    } else if (gameState === 'paused') {
+      gameState = 'countdown';
+      countdownMs = 3000;
+    }
+    return;
+  }
+
+  // Mute button hit
+  if (mx >= MUTE_BTN.x && mx <= MUTE_BTN.x + BTN_SIZE &&
+      my >= MUTE_BTN.y && my <= MUTE_BTN.y + BTN_SIZE) {
+    muted = !muted;
+    bgm.muted = muted;
+    return;
+  }
+
+  // Leaderboard button hit
+  if (mx >= LB_BTN.x && mx <= LB_BTN.x + BTN_SIZE &&
+      my >= LB_BTN.y && my <= LB_BTN.y + BTN_SIZE) {
+    showLeaderboard = !showLeaderboard;
+    if (showLeaderboard) {
+      fetchLeaderboard();
+      if (gameState === 'playing') {
+        gameState = 'paused';
+      }
+    }
+    return;
+  }
+
+  // Leaderboard overlay close button
+  if (showLeaderboard) {
+    const cbx = W / 2 - 60, cby = 370, cbw = 120, cbh = 36;
+    if (mx >= cbx && mx <= cbx + cbw && my >= cby && my <= cby + cbh) {
+      showLeaderboard = false;
+      return;
+    }
+    return; // consume click when overlay is open
+  }
+
+  // Pause overlay buttons
+  if (gameState === 'paused') {
+    const cbx = W / 2 - 80, cby = H / 2 + 10, cbw = 160, cbh = 44;
+    if (mx >= cbx && mx <= cbx + cbw && my >= cby && my <= cby + cbh) {
+      gameState = 'countdown';
+      countdownMs = 3000;
+      return;
+    }
+    const rbx = W / 2 - 80, rby = H / 2 + 70, rbw = 160, rbh = 44;
+    if (mx >= rbx && mx <= rbx + rbw && my >= rby && my <= rby + rbh) {
+      resetGame();
+      gameState = 'playing';
+      return;
+    }
+    // Mute button in pause overlay
+    const pmx = W / 2 + 100, pmy = H / 2 - 80;
+    if (mx >= pmx && mx <= pmx + 32 && my >= pmy && my <= pmy + 32) {
+      muted = !muted;
+      bgm.muted = muted;
+      return;
+    }
+    return;
+  }
+
+  handleFlap();
+}
+
+canvas.addEventListener('click', handleCanvasClick);
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleCanvasClick(e.touches[0]); });
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); handleFlap(); }
+  if (e.code === 'KeyM') { muted = !muted; bgm.muted = muted; }
+  if (e.code === 'KeyL') { showLeaderboard = !showLeaderboard; if (showLeaderboard) fetchLeaderboard(); }
+  if (e.code === 'KeyP' || e.code === 'Escape') {
+    if (gameState === 'playing') {
+      gameState = 'paused';
+    } else if (gameState === 'paused') {
+      gameState = 'countdown';
+      countdownMs = 3000;
+    }
+  }
+});
+
+// Draw functions
+function drawSpeedLines() {
+  for (let sl of speedLines) {
+    ctx.globalAlpha = sl.alpha;
+    const px = Math.round(sl.x / 2) * 2;
+    const py = Math.round(sl.y / 2) * 2;
+    const h = 4;
+    // Dark outline
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(px - sl.len - 2, py - 1, sl.len + 4, h + 2);
+    // White fill
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(px - sl.len, py + 1, sl.len, h - 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawParticles() {
+  for (let pt of particles) {
+    ctx.globalAlpha = pt.life;
+    ctx.fillStyle = pt.color;
+    const s = Math.max(2, Math.round(pt.size / 2) * 2);
+    const px = Math.round(pt.x / 2) * 2;
+    const py = Math.round(pt.y / 2) * 2;
+    ctx.fillRect(px - s / 2, py - s / 2, s, s);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawBird() {
+  ctx.save();
+  ctx.translate(bird.x, bird.y);
+  ctx.rotate(bird.rotation);
+  const size = BIRD_SIZE * 2;
+  ctx.drawImage(birdImg, -size / 2, -size / 2, size, size);
+  ctx.restore();
+}
+
+// Seeded random for consistent window patterns per pipe
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function drawBuilding(x, y1, y2, winColors) {
+  const w = PIPE_WIDTH;
+  // Building body
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(x, y1, w, y2 - y1);
+  ctx.strokeStyle = '#333355';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y1, w, y2 - y1);
+  // Windows (pixel grid, colors pre-computed)
+  const winW = 4, winH = 6, gap = 4;
+  let idx = 0;
+  for (let wy = y1 + 8; wy < y2 - 8; wy += winH + gap) {
+    for (let wx = x + 6; wx < x + w - 6; wx += winW + gap) {
+      ctx.fillStyle = winColors[idx++] || '#0a0a1a';
+      ctx.fillRect(wx, wy, winW, winH);
+    }
+  }
+  // Roof edge
+  ctx.fillStyle = '#2a2a4a';
+  ctx.fillRect(x - 2, y1, w + 4, 4);
+  ctx.fillRect(x - 2, y2 - 4, w + 4, 4);
+}
+
+function drawPipe(x, topH, bottomY, pipe) {
+  drawBuilding(x, 0, topH, pipe.topWins);
+  drawBuilding(x, bottomY, H, pipe.botWins);
+}
+
+
+// Pixel stars (pre-generated positions)
+const stars = [];
+for (let i = 0; i < 60; i++) {
+  stars.push({
+    x: Math.floor(Math.random() * W / 2) * 2,
+    y: Math.floor(Math.random() * (H - 100) / 2) * 2,
+    size: Math.random() > 0.8 ? 4 : 2,
+    twinkle: Math.random() * Math.PI * 2,
+  });
+}
+
+function drawBackground() {
+  // Night sky gradient
+  const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+  skyGrad.addColorStop(0, '#0a0a2e');
+  skyGrad.addColorStop(0.5, '#141438');
+  skyGrad.addColorStop(1, '#1a1a40');
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars (flicker)
+  for (let st of stars) {
+    const flicker = 0.5 + 0.5 * Math.sin(now * 0.002 + st.twinkle);
+    ctx.globalAlpha = flicker;
+    ctx.fillStyle = '#FFF';
+    ctx.fillRect(st.x, st.y, st.size, st.size);
+  }
+  ctx.globalAlpha = 1;
+
+  // Moon (pixel circle)
+  ctx.fillStyle = '#FFE8A0';
+  const moonX = W - 70, moonY = 60;
+  for (let dy = -16; dy <= 16; dy += 2) {
+    for (let dx = -16; dx <= 16; dx += 2) {
+      if (dx * dx + dy * dy <= 256) {
+        ctx.fillRect(moonX + dx, moonY + dy, 2, 2);
+      }
+    }
+  }
+  ctx.fillStyle = '#EED680';
+  ctx.fillRect(moonX - 4, moonY - 6, 4, 4);
+  ctx.fillRect(moonX + 6, moonY + 2, 4, 4);
+  ctx.fillRect(moonX - 2, moonY + 8, 4, 4);
+
+  // Ground (dark road)
+  ctx.fillStyle = '#1a1a28';
+  ctx.fillRect(0, H - 40, W, 40);
+  ctx.fillStyle = '#333350';
+  ctx.fillRect(0, H - 42, W, 4);
+  // Road dashes
+  ctx.fillStyle = '#555570';
+  for (let i = 0; i < W; i += 24) {
+    const ox = (now * 0.05) % 24;
+    ctx.fillRect(i - ox, H - 22, 12, 2);
+  }
+}
+
+
+// Pixel text helper — snaps to 2px grid
+function pixelText(text, x, y, size, color, align) {
+  ctx.fillStyle = color;
+  ctx.font = `bold ${size}px monospace`;
+  ctx.textAlign = align || 'center';
+  ctx.fillText(text, Math.round(x / 2) * 2, Math.round(y / 2) * 2);
+}
+
+// Pixel heart (filled block shape)
+function drawPixelHeart(x, y, s) {
+  const p = s / 5;
+  ctx.fillRect(x + p, y, p * 3, p);
+  ctx.fillRect(x, y + p, p * 5, p);
+  ctx.fillRect(x, y + p * 2, p * 5, p);
+  ctx.fillRect(x + p, y + p * 3, p * 3, p);
+  ctx.fillRect(x + p * 2, y + p * 4, p, p);
+}
+
+// Pixel box (sharp edges, no rounding)
+function pixelBox(x, y, w, h, fill, stroke) {
+  const px = Math.round(x / 2) * 2;
+  const py = Math.round(y / 2) * 2;
+  const pw = Math.round(w / 2) * 2;
+  const ph = Math.round(h / 2) * 2;
+  if (stroke) {
+    ctx.fillStyle = stroke;
+    ctx.fillRect(px - 2, py - 2, pw + 4, ph + 4);
+  }
+  ctx.fillStyle = fill;
+  ctx.fillRect(px, py, pw, ph);
+}
+
+function drawScore() {
+  pixelText(score, W / 2, 60, 36, '#FFF');
+}
+
+function drawLives() {
+  ctx.fillStyle = '#FF4444';
+  for (let i = 0; i < lives; i++) {
+    drawPixelHeart(10 + i * 24, 10, 16);
+  }
+}
+
+function drawReady() {
+  pixelText('点击开始', W / 2, H / 2 - 60, 22, '#FFF');
+
+  // Animated pixel arrow
+  const ay = Math.round((H / 2 - 10 + Math.sin(now * 0.003) * 8) / 2) * 2;
+  ctx.fillStyle = '#FFD700';
+  ctx.fillRect(W / 2 - 4, ay, 8, 8);
+  ctx.fillRect(W / 2 - 8, ay + 8, 16, 4);
+  ctx.fillRect(W / 2 - 12, ay + 12, 24, 4);
+
+  // Hints
+  pixelText('P:暂停  M:静音  L:排行', W / 2, H / 2 + 30, 11, 'rgba(255,255,255,0.6)');
+  pixelText('或点击下方按钮', W / 2, H / 2 + 48, 11, 'rgba(255,255,255,0.5)');
+}
+
+function drawGameOver() {
+  // Overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!scoreSubmitted) {
+    // Show basic game over panel while name input is pending
+    pixelBox(W / 2 - 120, H / 2 - 100, 240, 200, '#2D3436', '#E17055');
+    pixelText('游戏结束', W / 2, H / 2 - 55, 26, '#FF4444');
+    pixelText(`得分: ${score}`, W / 2, H / 2 - 10, 16, '#FFF');
+    pixelText(`最高: ${bestScore}`, W / 2, H / 2 + 20, 16, '#FFD700');
+    pixelBox(W / 2 - 70, H / 2 + 50, 140, 36, '#6C5CE7');
+    pixelText('点击重新开始', W / 2, H / 2 + 74, 13, '#FFF');
+  } else {
+    // Show leaderboard
+    const panelH = 340;
+    pixelBox(W / 2 - 120, 20, 240, panelH, '#2D3436', '#E17055');
+    pixelText('排行榜 Top 10', W / 2, 48, 16, '#FFD700');
+
+    // Header
+    pixelText('排名  昵称    分数', W / 2, 72, 10, '#888');
+
+    // Entries
+    const top10 = leaderboard.slice(0, 10);
+    for (let i = 0; i < top10.length; i++) {
+      const y = 92 + i * 22;
+      const r = top10[i];
+      const rank = `${i + 1}.`.padStart(3);
+      const name = r.name.padEnd(4).slice(0, 4);
+      const sc = String(r.score).padStart(4);
+      const isMe = r.score === score && r.name === lastSubmittedName;
+      const color = isMe ? '#FFD700' : (i < 3 ? '#FF8800' : '#CCC');
+      pixelText(`${rank}  ${name}  ${sc}`, W / 2, y, 12, color);
+    }
+
+    if (top10.length === 0) {
+      pixelText('暂无记录', W / 2, 120, 12, '#666');
+    }
+
+    // Restart button
+    pixelBox(W / 2 - 70, panelH - 10, 140, 36, '#6C5CE7');
+    pixelText('点击重新开始', W / 2, panelH + 14, 13, '#FFF');
+  }
+}
+
+// Game loop — dt in ms
+function update(dt) {
+  if (gameState === 'playing') {
+    // Physics normalized to 60fps baseline, scaled by GAME_SPEED
+    const dtFactor = (dt / MS_PER_FRAME) * GAME_SPEED;
+    bird.vy += GRAVITY * dtFactor;
+    bird.y += bird.vy * dtFactor;
+    bird.rotation = Math.min(Math.max(bird.vy * 0.05, -0.5), 1.2);
+
+    // Spawn trail particles behind the bird (reduced density, center-weighted)
+    if (Math.random() < 0.35) {
+      const particleColor = Math.random() < 0.5
+        ? `rgba(138,43,226,${0.5 + Math.random() * 0.5})`
+        : `rgba(30,144,255,${0.5 + Math.random() * 0.5})`;
+      const pxBase = 2;
+      // Triangular distribution centered on bird.y, spanning bird height
+      const yBias = (Math.random() + Math.random() - 1) * BIRD_SIZE * 0.8;
+      particles.push({
+        x: bird.x - BIRD_SIZE,
+        y: bird.y + yBias,
+        vx: -0.4 - Math.random() * 0.8,
+        vy: (Math.random() - 0.5) * 0.6,
+        size: (2 + Math.floor(Math.random() * 3)) * pxBase,
+        life: 1,
+        decay: 0.008 + Math.random() * 0.01,
+        color: particleColor,
+      });
+    }
+    
+    // Invincibility countdown (ms, scaled by GAME_SPEED)
+    if (invincibleTimerMs > 0) {
+      invincibleTimerMs -= dt * GAME_SPEED;
+      // Clamp bird position during invincibility
+      bird.y = Math.max(BIRD_SIZE, Math.min(H - 50 - BIRD_SIZE, bird.y));
+    }
+    
+    // Spawn pipes — bigger height jump → longer gap (ms, scaled by GAME_SPEED)
+    pipeSpawnTimerMs += dt * GAME_SPEED;
+    if (pipeSpawnTimerMs >= pipeSpawnIntervalMs) {
+      pipeSpawnTimerMs = 0;
+
+      // Gap shrinks as speed increases (170→100 at 300%)
+      const gapRatio = 1 - speedBonus * 0.0014;
+      const gapNow = Math.max(100, PIPE_GAP * gapRatio);
+
+      // Jump range narrows at high speed for smoother transitions
+      const jumpRange = (60 + 340 * Math.random()) * Math.max(0.3, gapRatio);
+      const jump = (Math.random() - 0.5) * jumpRange;
+      targetGapY += jump;
+      targetGapY = Math.max(80, Math.min(H - 80 - gapNow, targetGapY));
+      const topH = targetGapY;
+      // Pre-generate window colors (fixed per pipe, no flicker)
+      const rng = seededRand(Math.round(W * 137 + topH * 31) & 0x7FFFFFFF);
+      function genWinColors(y1, y2) {
+        const colors = [];
+        const winW = 4, winH = 6, gap = 4;
+        for (let wy = y1 + 8; wy < y2 - 8; wy += winH + gap) {
+          for (let wx = 6; wx < PIPE_WIDTH - 6; wx += winW + gap) {
+            const lit = rng() > 0.35;
+            colors.push(lit ? (rng() > 0.5 ? '#FFE066' : '#FFCC33') : '#0a0a1a');
+          }
+        }
+        return colors;
+      }
+      const topWins = genWinColors(0, topH);
+      const botWins = genWinColors(topH + gapNow, H);
+      pipes.push({ x: W, topH, bottomY: topH + gapNow, scored: false, topWins, botWins });
+
+      // Interval: bigger height jump → longer minimum gap, then add randomness
+      const heightDiff = Math.abs(targetGapY - lastPipeGapY);
+      const baseInterval = PIPE_BASE_INTERVAL_MS * Math.max(0.6, 1 - speedBonus * 0.001);
+      const minInterval = baseInterval + Math.floor((heightDiff / 80) * PIPE_EXTRA_INTERVAL_MS);
+      const randomRange = PIPE_BASE_INTERVAL_MS * 0.4; // 40% random variation
+      pipeSpawnIntervalMs = Math.min(PIPE_MAX_INTERVAL_MS, minInterval + Math.floor(Math.random() * randomRange));
+      lastPipeGapY = targetGapY;
+    }
+    
+    // Move pipes (ms), with speed bonus
+    const speedMul = minSpeedMultiplier + speedBonus / 100;
+    for (let p of pipes) {
+      p.x -= PIPE_SPEED * dtFactor * speedMul;
+
+      // Score
+      if (!p.scored && p.x + PIPE_WIDTH < bird.x) {
+        p.scored = true;
+        score++;
+        scoreSinceReset++;
+        scoreSound();
+        // Gain life every 20 points after score 76
+        if (score > 76 && (score - 76) % 20 === 0 && lives < MAX_LIVES) {
+          lives++;
+        }
+        // Increase min speed and max bonus every 40 points after score 76
+        if (score > 76 && (score - 76) % 40 === 0) {
+          minSpeedMultiplier += 0.1;
+          maxSpeedBonus += 30; // 10% of 300
+        }
+        if (scoreSinceReset % 3 === 0 && speedBonus < maxSpeedBonus) {
+          speedBonus = Math.min(speedBonus + 10, maxSpeedBonus);
+        }
+      }
+    }
+    
+    // Remove off-screen pipes
+    pipes = pipes.filter(p => p.x > -PIPE_WIDTH);
+
+    // Update particles
+    for (let pt of particles) {
+      pt.x += pt.vx * dtFactor;
+      pt.y += pt.vy * dtFactor;
+      pt.life -= pt.decay * dtFactor;
+      pt.size *= 0.98;
+    }
+    particles = particles.filter(pt => pt.life > 0);
+
+    // Speed lines — spawn and update
+    if (speedBonus >= 10) {
+      const spawnChance = 0.15 + (speedBonus / 300) * 0.6;
+      if (Math.random() < spawnChance) {
+        const len = 30 + (speedBonus / 300) * 80 + Math.random() * 40;
+        speedLines.push({
+          x: W + len,
+          y: Math.random() * (H - 80) + 20,
+          len,
+          speed: 6 + (speedBonus / 300) * 14 + Math.random() * 4,
+          alpha: 0.15 + (speedBonus / 300) * 0.3,
+        });
+      }
+      for (let sl of speedLines) {
+        sl.x -= sl.speed * dtFactor;
+      }
+      speedLines = speedLines.filter(sl => sl.x + sl.len > 0);
+    }
+
+    // Collision detection
+    if (bird.y > H - 50 || bird.y < 0) {
+      die(score < 76);
+    }
+    
+    let hitPipe = false;
+    for (let p of pipes) {
+      if (bird.x + BIRD_SIZE * 0.7 > p.x && bird.x - BIRD_SIZE * 0.7 < p.x + PIPE_WIDTH) {
+        if (bird.y - BIRD_SIZE * 0.6 < p.topH || bird.y + BIRD_SIZE * 0.6 > p.bottomY) {
+          hitPipe = true;
+          break;
+        }
+      }
+    }
+    if (hitPipe) {
+      speedBonus = 0;
+      scoreSinceReset = 0;
+      speedLines = [];
+      die(score < 76);
+    }
+  } else if (gameState === 'ready') {
+    bird.y = H / 2 + Math.sin(now * 0.003) * 15;
+  } else if (gameState === 'dead') {
+    deadTimerMs += dt * GAME_SPEED;
+  } else if (gameState === 'countdown') {
+    countdownMs -= dt;
+    if (countdownMs <= 0) {
+      countdownMs = 0;
+      gameState = 'playing';
+      lastTime = 0;
+    }
+  }
+  // 'paused' — do nothing, game frozen
+}
+
+function die(noLifeLoss) {
+  if (invincibleTimerMs > 0) return;
+  if (!noLifeLoss) lives--;
+  if (lives <= 0) {
+    gameState = 'dead';
+    deadTimerMs = 0;
+    speedBonus = 0;
+    scoreSinceReset = 0;
+    speedLines = [];
+    if (score > bestScore) bestScore = score;
+    hitSound();
+    fetchLeaderboard();
+    setTimeout(showNameInput, 500);
+  } else {
+    hitSound();
+    invincibleTimerMs = INVINCIBLE_MS;
+    bird.vy = FLAP;
+  }
+}
+
+function drawSpeedIndicator() {
+  const totalSpeed = minSpeedMultiplier + speedBonus / 100;
+  if (totalSpeed <= 1.0) return;
+  const color = totalSpeed >= 4.0 ? '#FF4444' : totalSpeed >= 2.5 ? '#FF8800' : '#FFD700';
+  pixelText(`x${totalSpeed.toFixed(1)}`, W - 10, 30, 14, color, 'right');
+}
+
+// UI buttons: Pause (top-left), Mute (next to pause), Leaderboard (next to mute)
+const BTN_SIZE = 32;
+const PAUSE_BTN = { x: 8, y: H - 42 };
+const MUTE_BTN = { x: 48, y: H - 42 };
+const LB_BTN = { x: 88, y: H - 42 };
+
+function drawUIButtons() {
+  const bx = PAUSE_BTN.x, by = PAUSE_BTN.y, s = BTN_SIZE;
+
+  // Pause button (pixel block)
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(bx, by, s, s);
+  ctx.fillStyle = '#FFF';
+  if (gameState === 'paused') {
+    // Play: pixel triangle
+    for (let i = 0; i < 10; i++) {
+      ctx.fillRect(bx + 8 + i * 2, by + 6 + i * 2, 2, 20 - i * 4);
+    }
+  } else {
+    // Pause: two pixel bars
+    ctx.fillRect(bx + 8, by + 6, 6, 20);
+    ctx.fillRect(bx + 18, by + 6, 6, 20);
+  }
+
+  // Mute button (pixel block)
+  const mx = MUTE_BTN.x;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(mx, by, s, s);
+  ctx.fillStyle = muted ? '#FF4444' : '#FFF';
+  // Pixel speaker
+  ctx.fillRect(mx + 6, by + 10, 6, 12);
+  ctx.fillRect(mx + 12, by + 8, 2, 4);
+  ctx.fillRect(mx + 14, by + 6, 2, 4);
+  ctx.fillRect(mx + 16, by + 4, 2, 4);
+  ctx.fillRect(mx + 12, by + 20, 2, 4);
+  ctx.fillRect(mx + 14, by + 22, 2, 4);
+  ctx.fillRect(mx + 16, by + 24, 2, 4);
+  ctx.fillRect(mx + 18, by + 4, 2, 24);
+  // Mute X
+  if (muted) {
+    ctx.fillRect(mx + 22, by + 8, 2, 2);
+    ctx.fillRect(mx + 24, by + 10, 2, 2);
+    ctx.fillRect(mx + 26, by + 12, 2, 2);
+    ctx.fillRect(mx + 28, by + 14, 2, 2);
+    ctx.fillRect(mx + 28, by + 8, 2, 2);
+    ctx.fillRect(mx + 26, by + 10, 2, 2);
+    ctx.fillRect(mx + 24, by + 12, 2, 2);
+    ctx.fillRect(mx + 22, by + 14, 2, 2);
+  }
+
+  // Leaderboard button (pixel trophy)
+  const lx = LB_BTN.x;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(lx, by, s, s);
+  ctx.fillStyle = showLeaderboard ? '#FFD700' : '#FFF';
+  // Trophy cup
+  ctx.fillRect(lx + 10, by + 6, 12, 10);
+  ctx.fillRect(lx + 8, by + 8, 16, 6);
+  // Trophy stem
+  ctx.fillRect(lx + 14, by + 16, 4, 4);
+  // Trophy base
+  ctx.fillRect(lx + 10, by + 20, 12, 4);
+}
+
+function drawPauseOverlay() {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, W, H);
+
+  pixelBox(W / 2 - 120, H / 2 - 80, 240, 220, '#2D3436', '#E17055');
+
+  pixelText('暂 停', W / 2, H / 2 - 30, 28, '#FFF');
+
+  // Continue button
+  pixelBox(W / 2 - 80, H / 2 + 10, 160, 44, '#6C5CE7');
+  pixelText('继 续', W / 2, H / 2 + 38, 18, '#FFF');
+
+  // Retry button
+  pixelBox(W / 2 - 80, H / 2 + 70, 160, 44, '#E17055');
+  pixelText('重 试', W / 2, H / 2 + 98, 18, '#FFF');
+
+  // Mute button in pause overlay
+  const mx = W / 2 + 100, my = H / 2 - 80;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(mx, my, 32, 32);
+  ctx.fillStyle = muted ? '#FF4444' : '#FFF';
+  // Speaker icon
+  ctx.fillRect(mx + 6, my + 10, 6, 12);
+  ctx.fillRect(mx + 12, my + 8, 2, 4);
+  ctx.fillRect(mx + 14, my + 6, 2, 4);
+  ctx.fillRect(mx + 16, my + 4, 2, 4);
+  ctx.fillRect(mx + 12, my + 20, 2, 4);
+  ctx.fillRect(mx + 14, my + 22, 2, 4);
+  ctx.fillRect(mx + 16, my + 24, 2, 4);
+  ctx.fillRect(mx + 18, my + 4, 2, 24);
+  // Mute X
+  if (muted) {
+    ctx.fillRect(mx + 22, my + 8, 2, 2);
+    ctx.fillRect(mx + 24, my + 10, 2, 2);
+    ctx.fillRect(mx + 26, my + 12, 2, 2);
+    ctx.fillRect(mx + 28, my + 14, 2, 2);
+    ctx.fillRect(mx + 28, my + 8, 2, 2);
+    ctx.fillRect(mx + 26, my + 10, 2, 2);
+    ctx.fillRect(mx + 24, my + 12, 2, 2);
+    ctx.fillRect(mx + 22, my + 14, 2, 2);
+  }
+}
+
+function drawCountdown() {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, W, H);
+
+  const sec = Math.ceil(countdownMs / 1000);
+  pixelText(sec, W / 2, H / 2 + 20, 72, '#FFD700');
+}
+
+function drawLeaderboardOverlay() {
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  const panelH = 380;
+  pixelBox(W / 2 - 130, 30, 260, panelH, '#2D3436', '#FFD700');
+  pixelText('排行榜 Top 10', W / 2, 60, 18, '#FFD700');
+
+  // Header
+  pixelText('排名  昵称    分数', W / 2, 88, 10, '#888');
+
+  // Entries
+  const top10 = leaderboard.slice(0, 10);
+  for (let i = 0; i < top10.length; i++) {
+    const y = 110 + i * 24;
+    const r = top10[i];
+    const rank = `${i + 1}.`.padStart(3);
+    const name = r.name.padEnd(4).slice(0, 4);
+    const sc = String(r.score).padStart(4);
+    const color = i < 3 ? '#FF8800' : '#CCC';
+    pixelText(`${rank}  ${name}  ${sc}`, W / 2, y, 12, color);
+  }
+
+  if (top10.length === 0) {
+    pixelText('暂无记录', W / 2, 140, 12, '#666');
+  }
+
+  // Close button
+  pixelBox(W / 2 - 60, panelH - 10, 120, 36, '#6C5CE7');
+  pixelText('关 闭', W / 2, panelH + 14, 14, '#FFF');
+}
+
+function draw() {
+  drawBackground();
+  
+  for (let p of pipes) {
+    drawPipe(p.x, p.topH, p.bottomY, p);
+  }
+  
+  drawSpeedLines();
+  drawParticles();
+
+  // Bird blinks during invincibility (200ms on/off)
+  if (invincibleTimerMs <= 0 || Math.floor(now / 200) % 2 === 0) {
+    drawBird();
+  }
+  drawScore();
+  drawLives();
+  drawSpeedIndicator();
+  
+  if (gameState === 'ready') drawReady();
+  if (gameState === 'dead') drawGameOver();
+  if (gameState === 'paused') drawPauseOverlay();
+  if (gameState === 'countdown') drawCountdown();
+  if (gameState !== 'paused') drawUIButtons();
+  if (showLeaderboard) drawLeaderboardOverlay();
+}
+
+function gameLoop(timestamp) {
+  if (lastTime === 0) lastTime = timestamp;
+  const dt = Math.min(timestamp - lastTime, 50); // cap at 50ms to avoid spiral
+  lastTime = timestamp;
+  now += dt;
+  
+  update(dt);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// Intro overlay
+const introEl = document.getElementById('intro');
+const introBtn = document.getElementById('introStart');
+introBtn.addEventListener('click', () => {
+  introEl.classList.add('hidden');
+  requestAnimationFrame(gameLoop);
+});
+
+// Pause music when page is hidden (mobile users leaving browser)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    bgm.pause();
+  } else if (bgmStarted && !muted) {
+    bgm.play().catch(() => {});
+  }
+});
+
+// Leaderboard
+let leaderboard = [];
+let leaderboardTime = 0;
+const LEADERBOARD_CACHE_MS = 10000;
+
+async function fetchLeaderboard() {
+  const now = Date.now();
+  if (leaderboard.length > 0 && now - leaderboardTime < LEADERBOARD_CACHE_MS) return;
+  try {
+    const res = await fetch('/api/leaderboard');
+    leaderboard = await res.json();
+    leaderboardTime = now;
+  } catch (e) {}
+}
+
+async function submitScore(name, score) {
+  const res = await fetch('/api/score', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, score }),
+  });
+  return await res.json();
+}
+
+// Nickname input overlay
+const nameInputEl = document.getElementById('nameInput');
+const nameField = document.getElementById('nameField');
+const submitBtn = document.getElementById('submitBtn');
+const submitMsg = document.getElementById('submitMsg');
+
+function showNameInput() {
+  scoreSubmitted = false;
+  nameInputEl.classList.add('show');
+  nameField.value = '';
+  submitMsg.textContent = '';
+  // Reset button state
+  submitBtn.textContent = '上榜';
+  submitBtn.disabled = false;
+  nameField.focus();
+}
+
+function hideNameInput() {
+  nameInputEl.classList.remove('show');
+}
+
+submitBtn.addEventListener('click', async () => {
+  // If already submitted, close and show leaderboard
+  if (scoreSubmitted) {
+    hideNameInput();
+    showLeaderboard = true;
+    return;
+  }
+
+  const name = nameField.value.trim();
+  if (!name) { submitMsg.textContent = '请输入昵称'; return; }
+  submitMsg.textContent = '提交中...';
+  submitMsg.style.color = '#FFD700';
+  submitBtn.disabled = true;
+  const result = await submitScore(name, score);
+  submitBtn.disabled = false;
+  if (result.ok) {
+    scoreSubmitted = true;
+    lastSubmittedName = name;
+    submitMsg.textContent = '提交成功！';
+    submitMsg.style.color = '#4CAF50';
+    submitBtn.textContent = '查看排行榜';
+    // Force refresh leaderboard
+    leaderboardTime = 0;
+    await fetchLeaderboard();
+  } else {
+    submitMsg.textContent = result.error || '提交失败';
+    submitMsg.style.color = '#FF4444';
+  }
+});
+
+nameField.addEventListener('keydown', (e) => {
+  if (e.code === 'Enter') submitBtn.click();
+});
+
+// Close button for name input
+document.getElementById('closeNameInput').addEventListener('click', () => {
+  hideNameInput();
+});
+</script>
+</body>
+</html>

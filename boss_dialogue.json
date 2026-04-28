@@ -1,0 +1,59 @@
+{
+  "title": "黑塔女士的追击",
+  "trigger_score": 76,
+  "scenes": [
+    {
+      "id": "herta_appear",
+      "speaker": "herta",
+      "speaker_name": "黑塔",
+      "lines": [
+        "哦？以为偷走账号就能跑掉？",
+        "太天真了，小骇客。"
+      ]
+    },
+    {
+      "id": "silverwolf_response",
+      "speaker": "silverwolf",
+      "speaker_name": "银狼",
+      "lines": [
+        "切，这么快就追上来了？",
+        "不过我可没打算束手就擒！"
+      ]
+    },
+    {
+      "id": "herta_threat",
+      "speaker": "herta",
+      "speaker_name": "黑塔",
+      "lines": [
+        "乖乖把账号交出来，",
+        "不然让你见识一下人偶军团的力量。"
+      ]
+    },
+    {
+      "id": "silverwolf_challenge",
+      "speaker": "silverwolf",
+      "speaker_name": "银狼",
+      "lines": [
+        "来啊！让我看看你有什么本事！",
+        "这次不会再输了！"
+      ]
+    }
+  ],
+  "victory": {
+    "speaker": "silverwolf",
+    "speaker_name": "银狼",
+    "lines": [
+      "呼……总算把黑塔打跑了！",
+      "账号到手，撤退！",
+      "下次再来挑战吧，黑塔女士~"
+    ]
+  },
+  "defeat": {
+    "speaker": "herta",
+    "speaker_name": "黑塔",
+    "lines": [
+      "就这种程度吗？太令人失望了。",
+      "账号我就收回去了。"
+    ]
+  }
+}
