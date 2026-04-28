@@ -382,6 +382,15 @@ function resetGame() {
 
 resetGame();
 
+function skipToBoss() {
+  score = 76;
+  pipes = [];
+  speedBonus = 0;
+  scoreSinceReset = 0;
+  bossPhase = 'warning';
+  bossWarningTimer = 0;
+}
+
 // Input
 function handleFlap() {
   initAudio();
@@ -440,6 +449,15 @@ function handleCanvasClick(e) {
       if (gameState === 'playing') {
         gameState = 'paused';
       }
+    }
+    return;
+  }
+
+  // Skip to boss button hit
+  if (mx >= SKIP_BTN.x && mx <= SKIP_BTN.x + BTN_SIZE &&
+      my >= SKIP_BTN.y && my <= SKIP_BTN.y + BTN_SIZE) {
+    if (gameState === 'playing' && bossPhase === 'none' && score < 76) {
+      skipToBoss();
     }
     return;
   }
@@ -1412,6 +1430,7 @@ const BTN_SIZE = 32;
 const PAUSE_BTN = { x: 8, y: H - 42 };
 const MUTE_BTN = { x: 48, y: H - 42 };
 const LB_BTN = { x: 88, y: H - 42 };
+const SKIP_BTN = { x: 128, y: H - 42 };
 
 function drawUIButtons() {
   const bx = PAUSE_BTN.x, by = PAUSE_BTN.y, s = BTN_SIZE;
@@ -1469,6 +1488,30 @@ function drawUIButtons() {
   ctx.fillRect(lx + 14, by + 16, 4, 4);
   // Trophy base
   ctx.fillRect(lx + 10, by + 20, 12, 4);
+
+  // Skip to boss button (pixel fast-forward) — only show before boss
+  if (bossPhase === 'none' && score < 76) {
+    const sx = SKIP_BTN.x;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(sx, by, s, s);
+    ctx.fillStyle = '#FF8800';
+    // Fast-forward: two triangles
+    ctx.fillRect(sx + 6, by + 8, 2, 2);
+    ctx.fillRect(sx + 8, by + 10, 2, 2);
+    ctx.fillRect(sx + 10, by + 12, 2, 2);
+    ctx.fillRect(sx + 8, by + 14, 2, 2);
+    ctx.fillRect(sx + 6, by + 16, 2, 2);
+    ctx.fillRect(sx + 14, by + 8, 2, 2);
+    ctx.fillRect(sx + 16, by + 10, 2, 2);
+    ctx.fillRect(sx + 18, by + 12, 2, 2);
+    ctx.fillRect(sx + 16, by + 14, 2, 2);
+    ctx.fillRect(sx + 14, by + 16, 2, 2);
+    // "BOSS" label below
+    ctx.font = 'bold 7px monospace';
+    ctx.fillStyle = '#FF8800';
+    ctx.textAlign = 'center';
+    ctx.fillText('BOSS', sx + s / 2, by + s + 10);
+  }
 }
 
 function drawPauseOverlay() {
