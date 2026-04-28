@@ -749,9 +749,17 @@ function update(dt) {
   if (gameState === 'playing') {
     // Physics normalized to 60fps baseline, scaled by GAME_SPEED
     const dtFactor = (dt / MS_PER_FRAME) * GAME_SPEED;
-    bird.vy += GRAVITY * dtFactor;
-    bird.y += bird.vy * dtFactor;
-    bird.rotation = Math.min(Math.max(bird.vy * 0.05, -0.5), 1.2);
+
+    // Freeze bird during dialogue/victory phases
+    if (bossPhase === 'dialogue' || bossPhase === 'victory') {
+      bird.y = H / 2;
+      bird.vy = 0;
+      bird.rotation = 0;
+    } else {
+      bird.vy += GRAVITY * dtFactor;
+      bird.y += bird.vy * dtFactor;
+      bird.rotation = Math.min(Math.max(bird.vy * 0.05, -0.5), 1.2);
+    }
 
     // Spawn trail particles behind the bird (reduced density, center-weighted)
     if (Math.random() < 0.35) {
