@@ -2163,9 +2163,6 @@ function drawBossDialogue() {
     for (let i = 0; i < puppetCount; i++) {
       const px = startX + i * (singleW + 8);
       ctx.drawImage(puppetImg, px, portraitY, singleW, portraitH);
-      ctx.strokeStyle = '#e94560';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(px, portraitY, singleW, portraitH);
     }
   } else {
     const portraitW = speaker === 'herta' ? 140 : 80;
@@ -2177,9 +2174,6 @@ function drawBossDialogue() {
     } else {
       ctx.drawImage(birdImg, portraitX, portraitY, portraitW, portraitH);
     }
-    ctx.strokeStyle = speaker === 'herta' ? '#e94560' : '#6C5CE7';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(portraitX, portraitY, portraitW, portraitH);
   }
 }
 
