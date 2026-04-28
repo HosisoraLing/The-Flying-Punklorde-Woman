@@ -350,7 +350,7 @@ let puppets = []; // { x, y, vy, hp, timer, attackTimer, moveDir }
 const PUPPET_WIDTH = 50;
 const PUPPET_HEIGHT = 60;
 const PUPPET_SPAWN_INTERVAL = 8000; // ms
-const PUPPET_MAX = 2;
+const PUPPET_MAX = 5;
 let puppetSpawnTimer = 0;
 
 // Boss entrance animation
@@ -1369,12 +1369,12 @@ function updateBoss(dt, dtFactor) {
         const dx = boss.x - b.x;
         const dy = boss.y - b.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const trackStr = 0.12;
+        const trackStr = 0.35;
         b.vx += (dx / dist) * trackStr * dtFactor;
         b.vy += (dy / dist) * trackStr * dtFactor;
         // Cap speed
         const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-        if (spd > 9) { b.vx = (b.vx / spd) * 9; b.vy = (b.vy / spd) * 9; }
+        if (spd > 12) { b.vx = (b.vx / spd) * 12; b.vy = (b.vy / spd) * 12; }
       }
       b.x += b.vx * dtFactor;
       b.y += b.vy * dtFactor;
@@ -1996,14 +1996,6 @@ function drawPuppets() {
   for (let p of puppets) {
     const px = Math.round(p.x / 2) * 2;
     const py = Math.round(p.y / 2) * 2;
-    // Puppet glow
-    ctx.save();
-    ctx.globalAlpha = 0.15 + Math.sin(now * 0.004) * 0.1;
-    ctx.shadowColor = '#e94560';
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = '#e94560';
-    ctx.fillRect(px - PUPPET_WIDTH / 2, py - PUPPET_HEIGHT / 2, PUPPET_WIDTH, PUPPET_HEIGHT);
-    ctx.restore();
     // Puppet sprite
     ctx.drawImage(puppetImg, px - PUPPET_WIDTH / 2, py - PUPPET_HEIGHT / 2, PUPPET_WIDTH, PUPPET_HEIGHT);
     // HP bar under puppet
