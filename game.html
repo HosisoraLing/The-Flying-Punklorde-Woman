@@ -229,6 +229,13 @@ function flapSound() { playSound(600, 'square', 0.1, 0.2); }
 function scoreSound() { playSound(880, 'sine', 0.15, 0.3); setTimeout(() => playSound(1100, 'sine', 0.2, 0.3), 100); }
 function hitSound() { playSound(200, 'sawtooth', 0.3, 0.4); setTimeout(() => playSound(100, 'sawtooth', 0.4, 0.3), 150); }
 
+// Boss battle sound effects
+function playerShootSound() { playSound(900, 'square', 0.06, 0.12); }
+function playerLaserSound() { playSound(1200, 'sawtooth', 0.08, 0.08); }
+function bossLaserWarnSound() { playSound(300, 'square', 0.15, 0.15); setTimeout(() => playSound(300, 'square', 0.15, 0.15), 200); }
+function bossLaserFireSound() { playSound(150, 'sawtooth', 0.5, 0.2); setTimeout(() => playSound(100, 'sawtooth', 0.4, 0.15), 100); }
+function bossDiamondSound() { playSound(500, 'triangle', 0.12, 0.15); }
+
 // BGM
 const bgm = new Audio('bgm.mp3');
 bgm.loop = true;
@@ -1180,6 +1187,7 @@ function updateBoss(dt, dtFactor) {
         const warnY = boss.y;
         boss.firingLaser = true;
         laserWarnings.push({ y: warnY, timer: 0, duration: LASER_WARN_DURATION, fired: false, source: 'boss', sourceX: boss.x, sourceY: boss.y, ref: boss });
+        bossLaserWarnSound();
       } else if (boss.attackPattern === 1) {
         // Diamond bullets — aimed at player (slower)
         const dx = bird.x - boss.x;
@@ -1195,6 +1203,7 @@ function updateBoss(dt, dtFactor) {
           size: 10,
           life: 5000,
         });
+        bossDiamondSound();
       } else {
         // Spread diamonds (slower)
         for (let i = -1; i <= 1; i++) {
@@ -1208,6 +1217,7 @@ function updateBoss(dt, dtFactor) {
             life: 4000,
           });
         }
+        bossDiamondSound();
       }
     }
 
@@ -1217,6 +1227,7 @@ function updateBoss(dt, dtFactor) {
       if (w.timer >= w.duration && !w.fired) {
         w.fired = true;
         w.fireTime = 0;
+        bossLaserFireSound();
       }
       // Active laser beam
       if (w.fired) {
@@ -1259,6 +1270,7 @@ function updateBoss(dt, dtFactor) {
       const shootInterval = activeEffects.bulletSplit > 0 ? PLAYER_SHOOT_INTERVAL * 1.2 : PLAYER_SHOOT_INTERVAL;
       if (playerShootTimer >= shootInterval) {
         playerShootTimer = 0;
+        playerShootSound();
         // Normal ray bullet
         playerBullets.push({
           x: bird.x + BIRD_SIZE,
@@ -1298,6 +1310,7 @@ function updateBoss(dt, dtFactor) {
       playerLaserHitTimer += dt;
       if (playerLaserHitTimer >= 100) { // damage every 100ms
         playerLaserHitTimer = 0;
+        playerLaserSound();
         // Check if laser hits boss
         const bossLeft = boss.x - BOSS_WIDTH / 2;
         const bossTop = boss.y - BOSS_HEIGHT / 2;
@@ -1587,6 +1600,7 @@ function updateBoss(dt, dtFactor) {
         p.attackTimer = 0;
         p.firingLaser = true;
         laserWarnings.push({ y: p.y, timer: 0, duration: LASER_WARN_DURATION, fired: false, source: 'puppet', sourceX: p.x, sourceY: p.y, ref: p });
+        bossLaserWarnSound();
       }
       // Stop puppet movement while firing laser
       if (p.firingLaser) {
@@ -2124,9 +2138,7 @@ function drawBossDialogue() {
   }
 
   // Draw speaker portrait in center of screen
-  const portraitW = speaker === 'puppet' ? 100 : (speaker === 'herta' ? 140 : 80);
-  const portraitH = speaker === 'puppet' ? 120 : (speaker === 'herta' ? 160 : 80);
-  const portraitX = W / 2 - portraitW / 2;
+  const portraitH = speaker === 'herta' ? 160 : (speaker === 'puppet' ? 100 : 80);
   const portraitY = boxY - portraitH - 20;
 
   // Portrait background glow
@@ -2135,22 +2147,36 @@ function drawBossDialogue() {
   ctx.shadowColor = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
   ctx.shadowBlur = 30;
   ctx.fillStyle = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
-  ctx.fillRect(portraitX - 4, portraitY - 4, portraitW + 8, portraitH + 8);
-  ctx.restore();
 
-  // Portrait image
-  if (speaker === 'herta') {
-    ctx.drawImage(bossImg, portraitX, portraitY, portraitW, portraitH);
-  } else if (speaker === 'puppet') {
-    ctx.drawImage(puppetImg, portraitX, portraitY, portraitW, portraitH);
+  if (speaker === 'puppet') {
+    // Show 5 puppets in a row
+    const puppetCount = 5;
+    const singleW = 70;
+    const totalW = puppetCount * singleW + (puppetCount - 1) * 8;
+    const startX = W / 2 - totalW / 2;
+    ctx.fillRect(startX - 4, portraitY - 4, totalW + 8, portraitH + 8);
+    ctx.restore();
+    for (let i = 0; i < puppetCount; i++) {
+      const px = startX + i * (singleW + 8);
+      ctx.drawImage(puppetImg, px, portraitY, singleW, portraitH);
+      ctx.strokeStyle = '#e94560';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(px, portraitY, singleW, portraitH);
+    }
   } else {
-    ctx.drawImage(birdImg, portraitX, portraitY, portraitW, portraitH);
+    const portraitW = speaker === 'herta' ? 140 : 80;
+    const portraitX = W / 2 - portraitW / 2;
+    ctx.fillRect(portraitX - 4, portraitY - 4, portraitW + 8, portraitH + 8);
+    ctx.restore();
+    if (speaker === 'herta') {
+      ctx.drawImage(bossImg, portraitX, portraitY, portraitW, portraitH);
+    } else {
+      ctx.drawImage(birdImg, portraitX, portraitY, portraitW, portraitH);
+    }
+    ctx.strokeStyle = speaker === 'herta' ? '#e94560' : '#6C5CE7';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(portraitX, portraitY, portraitW, portraitH);
   }
-
-  // Portrait border
-  ctx.strokeStyle = speaker === 'herta' || speaker === 'puppet' ? '#e94560' : '#6C5CE7';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(portraitX, portraitY, portraitW, portraitH);
 }
 
 function drawPlayerBullets() {
