@@ -1,43 +1,43 @@
-# The Flying Punklorde
+# 飞翔的朋克洛德人
 
-An Honkai: Star Rail themed Flappy Bird game featuring Silver Wolf.
+一款基于《崩坏：星穹铁道》的 Flappy Bird 同人游戏，主角为银狼。
 
-## How to Play
+## 玩法说明
 
-Open `index.html` in a browser. Click or tap to flap and avoid pipes.
+打开 `index.html` 即可游玩。点击或触屏控制银狼飞行，躲避管道。
 
-## Features
+## 游戏特色
 
-- **Silver Wolf as the protagonist** — pixel art style, auto-shooting blue ray bullets
-- **Boss battle at score 76** — Herta (黑塔) appears with her puppet army
-- **Dialogue system** — JSON-driven story scenes between Silver Wolf and Herta
-- **Power-ups** — hearts, bullet time, laser weapon, bullet split, bullet tracking
-- **Boss mechanics** — laser beams with telegraph warnings, diamond bullets, puppet spawns
-- **Half-heart HP system** — 3 hearts total, laser deals 1 heart, diamond deals half
-- **Sound effects** — synthesized via Web Audio API
-- **Leaderboard** — local score tracking
-- **Responsive** — works on desktop and mobile
+- **银狼主角** — 像素风格，自动发射蓝色射线子弹
+- **第76层 Boss 战** — 黑塔女士带着人偶军团登场
+- **对话系统** — JSON 驱动的剧情对话
+- **加成道具** — 爱心、子弹时间、激光武器、子弹分裂、子弹追踪
+- **Boss 机制** — 激光预警、钻石弹幕、人偶召唤
+- **半心生命值系统** — 共 3 颗心，激光扣 1 颗，钻石扣半颗
+- **音效** — Web Audio API 合成
+- **排行榜** — 本地分数记录
+- **适配移动端** — 支持手机和电脑
 
-## Boss Fight
+## Boss 战流程
 
-At score 76, the game transitions into a boss battle:
+第 76 层触发 Boss 战：
 
-1. WARNING banner appears, pipes stop spawning
-2. Silver Wolf moves to center screen
-3. Herta descends from above
-4. Dialogue scenes play out
-5. Battle begins — dodge lasers, destroy puppets, take down Herta (300 HP)
+1. 出现 WARNING 警告，管道停止生成
+2. 银狼移动到屏幕中央
+3. 黑塔从上方降落入场
+4. 播放剧情对话
+5. 战斗开始 — 躲避激光、消灭人偶、击败黑塔（300 血量）
 
-## Controls
+## 操作方式
 
-- **Click / Tap / Space** — Flap
-- **P** — Pause
-- **M** — Mute
+- **点击 / 触屏 / 空格** — 飞行
+- **P** — 暂停
+- **M** — 静音
 
-## Tech
+## 技术说明
 
-Single-file HTML5 Canvas game. No dependencies. Pure JavaScript with Web Audio API for sound.
+单文件 HTML5 Canvas 游戏，无任何依赖。纯 JavaScript + Web Audio API 音效。
 
-## License
+## 版权声明
 
-Fan-made game. Honkai: Star Rail characters belong to HoYoverse.
+粉丝同人作品。崩坏：星穹铁道角色版权归米哈游所有。
