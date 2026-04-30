@@ -646,8 +646,9 @@ function drawBuilding(x, y1, y2, winColors) {
 }
 
 function drawPipe(x, topH, bottomY, pipe) {
-  drawBuilding(x, 0, topH, pipe.topWins);
-  drawBuilding(x, bottomY, H, pipe.botWins);
+  const rx = Math.round(x / 2) * 2;
+  drawBuilding(rx, 0, topH, pipe.topWins);
+  drawBuilding(rx, bottomY, H, pipe.botWins);
 }
 
 
