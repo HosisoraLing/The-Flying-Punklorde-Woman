@@ -287,6 +287,7 @@ let lastSubmittedName = '';
 const MAX_LIVES = 4;
 const INITIAL_LIVES = 3;
 let lives, invincibleTimerMs;
+let tempExtraLives = 0; // temporary extra lives from heart power-ups at full HP
 let speedBonus = 0; // 0–300, percentage bonus on pipe speed
 let scoreSinceReset = 0; // points gained since last speed reset
 let minSpeedMultiplier = 1.0; // minimum speed multiplier after 76 pipes
@@ -343,6 +344,7 @@ let playerWeapon = 'normal';
 
 // Half-heart HP system for boss fight (max = lives * 2)
 let playerHP = 6;
+let maxPlayerHP = 6; // actual max including temp lives
 const MAX_HP = 6; // 3 hearts * 2
 
 // Laser warning system
@@ -389,6 +391,7 @@ function resetGame() {
   pipeSpawnTimerMs = 0;
   pipeSpawnIntervalMs = PIPE_BASE_INTERVAL_MS;
   lives = INITIAL_LIVES;
+  tempExtraLives = 0;
   invincibleTimerMs = 0;
   deadTimerMs = 0;
   speedBonus = 0;
@@ -419,6 +422,7 @@ function resetGame() {
   bossDamageFlash = 0;
   playerWeapon = 'normal';
   playerHP = MAX_HP;
+  maxPlayerHP = MAX_HP;
   laserWarnings = [];
   bossEntranceY = -BOSS_HEIGHT;
   bossEntranceDone = false;
@@ -750,7 +754,7 @@ function drawLives() {
   ctx.fillStyle = '#FF4444';
   if (bossPhase === 'fight' || bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat' || bossPhase === 'clearing') {
     // Boss fight: show half-hearts based on playerHP
-    const maxHearts = MAX_HP / 2;
+    const maxHearts = maxPlayerHP / 2;
     for (let i = 0; i < maxHearts; i++) {
       const hpForThisHeart = Math.max(0, Math.min(2, playerHP - i * 2));
       if (hpForThisHeart >= 2) {
@@ -1034,6 +1038,7 @@ function die(noLifeLoss) {
     // Reset boss state on death
     bossPhase = 'none';
     boss = null;
+    tempExtraLives = 0;
     bossProjectiles = [];
     playerBullets = [];
     powerUps = [];
@@ -1113,7 +1118,8 @@ function updateBoss(dt, dtFactor) {
       playerShootTimer = 0;
       powerUpSpawnTimer = 0;
       laserWarnings = [];
-      playerHP = MAX_HP;
+      playerHP = Math.min(MAX_HP + tempExtraLives * 2, 10); // temp extra lives add HP, cap at 5 hearts
+      maxPlayerHP = playerHP;
       activeEffects = { bulletTime: 0, laserWeapon: 0, bulletSplit: 0, bulletTracking: 0 };
       playerWeapon = 'normal';
       return;
@@ -1199,7 +1205,7 @@ function updateBoss(dt, dtFactor) {
         // Laser beam — first show warning line, then fire
         const warnY = boss.y;
         boss.firingLaser = true;
-        laserWarnings.push({ y: warnY, timer: 0, duration: LASER_WARN_DURATION, fired: false, source: 'boss', sourceX: boss.x, sourceY: boss.y, ref: boss });
+        laserWarnings.push({ y: warnY, timer: 0, duration: LASER_WARN_DURATION, fired: false, source: 'boss', sourceX: boss.x, sourceY: boss.y, ref: boss, cancelled: false });
         bossLaserWarnSound();
       } else if (boss.attackPattern === 1) {
         // Diamond bullets — aimed at player (slower)
@@ -1236,6 +1242,7 @@ function updateBoss(dt, dtFactor) {
 
     // Update laser warnings — after warning, fire stationary beam at fixed Y
     for (let w of laserWarnings) {
+      if (w.cancelled) continue;
       w.timer += dt * btFactor;
       if (w.timer >= w.duration && !w.fired) {
         w.fired = true;
@@ -1274,7 +1281,7 @@ function updateBoss(dt, dtFactor) {
         }
       }
     }
-    laserWarnings = laserWarnings.filter(w => !w.fired || w.fireTime < 1200);
+    laserWarnings = laserWarnings.filter(w => !w.cancelled && (!w.fired || w.fireTime < 1200));
 
     // Player auto-shooting
     playerLaserActive = playerWeapon === 'laser';
@@ -1399,17 +1406,32 @@ function updateBoss(dt, dtFactor) {
 
     // Update player bullets
     for (let b of playerBullets) {
-      // Bullet tracking
-      if (activeEffects.bulletTracking > 0 && b.type !== 'laser' && boss) {
-        const dx = boss.x - b.x;
-        const dy = boss.y - b.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const trackStr = 0.35;
-        b.vx += (dx / dist) * trackStr * dtFactor;
-        b.vy += (dy / dist) * trackStr * dtFactor;
-        // Cap speed
-        const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
-        if (spd > 12) { b.vx = (b.vx / spd) * 12; b.vy = (b.vy / spd) * 12; }
+      // Bullet tracking — find nearest enemy (boss or puppet)
+      if (activeEffects.bulletTracking > 0 && b.type !== 'laser') {
+        let targetX = null, targetY = null, minDist = Infinity;
+        if (boss) {
+          const dx = boss.x - b.x;
+          const dy = boss.y - b.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < minDist) { minDist = d; targetX = boss.x; targetY = boss.y; }
+        }
+        for (let p of puppets) {
+          const dx = p.x - b.x;
+          const dy = p.y - b.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < minDist) { minDist = d; targetX = p.x; targetY = p.y; }
+        }
+        if (targetX !== null) {
+          const dx = targetX - b.x;
+          const dy = targetY - b.y;
+          const dist = minDist || 1;
+          const trackStr = 0.35;
+          b.vx += (dx / dist) * trackStr * dtFactor;
+          b.vy += (dy / dist) * trackStr * dtFactor;
+          // Cap speed
+          const spd = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+          if (spd > 12) { b.vx = (b.vx / spd) * 12; b.vy = (b.vy / spd) * 12; }
+        }
       }
       b.x += b.vx * dtFactor;
       b.y += b.vy * dtFactor;
@@ -1612,7 +1634,7 @@ function updateBoss(dt, dtFactor) {
       if (p.x <= 300 && p.attackTimer >= 5000) {
         p.attackTimer = 0;
         p.firingLaser = true;
-        laserWarnings.push({ y: p.y, timer: 0, duration: LASER_WARN_DURATION, fired: false, source: 'puppet', sourceX: p.x, sourceY: p.y, ref: p });
+        laserWarnings.push({ y: p.y, timer: 0, duration: LASER_WARN_DURATION, fired: false, source: 'puppet', sourceX: p.x, sourceY: p.y, ref: p, cancelled: false });
         bossLaserWarnSound();
       }
       // Stop puppet movement while firing laser
@@ -1659,7 +1681,10 @@ function updateBoss(dt, dtFactor) {
             }
             // Cancel any laser warnings from this puppet
             for (let w = laserWarnings.length - 1; w >= 0; w--) {
-              if (laserWarnings[w].ref === p) laserWarnings.splice(w, 1);
+              if (laserWarnings[w].ref === p) {
+                laserWarnings[w].cancelled = true;
+                laserWarnings.splice(w, 1);
+              }
             }
             puppets.splice(j, 1);
             scoreSound();
@@ -1673,7 +1698,10 @@ function updateBoss(dt, dtFactor) {
     const offscreenPuppets = puppets.filter(p => p.x <= -PUPPET_WIDTH * 2);
     if (offscreenPuppets.length > 0) {
       for (let w = laserWarnings.length - 1; w >= 0; w--) {
-        if (offscreenPuppets.includes(laserWarnings[w].ref)) laserWarnings.splice(w, 1);
+        if (offscreenPuppets.includes(laserWarnings[w].ref)) {
+          laserWarnings[w].cancelled = true;
+          laserWarnings.splice(w, 1);
+        }
       }
     }
     puppets = puppets.filter(p => p.x > -PUPPET_WIDTH * 2);
@@ -1760,6 +1788,8 @@ function handleBossDialogueAdvance() {
       powerUps = [];
       puppets = [];
       laserWarnings = [];
+      lives = INITIAL_LIVES;
+      tempExtraLives = 0;
       // Continue playing with increased score milestones
     }
     bossDialogueCharTimer = 0;
@@ -1777,6 +1807,7 @@ function handleBossDialogueAdvance() {
       // Defeat dialogue done — trigger actual death
       bossPhase = 'none';
       boss = null;
+      tempExtraLives = 0;
       gameState = 'dead';
       deadTimerMs = 0;
       speedBonus = 0;
@@ -1795,7 +1826,13 @@ function handleBossDialogueAdvance() {
 function applyPowerUp(type) {
   scoreSound();
   if (type === 'heart') {
-    if (playerHP < MAX_HP) playerHP = Math.min(MAX_HP, playerHP + 2); // +1 heart
+    if (playerHP < maxPlayerHP) {
+      playerHP = Math.min(maxPlayerHP, playerHP + 2); // +1 heart
+    } else {
+      tempExtraLives++; // temporary extra life at full HP
+      maxPlayerHP = Math.min(MAX_HP + tempExtraLives * 2, 10);
+      playerHP = maxPlayerHP;
+    }
   } else if (type === 'bulletTime') {
     activeEffects.bulletTime = 6000;
   } else if (type === 'laser') {
@@ -2255,6 +2292,7 @@ function drawPlayerBullets() {
 
 function drawLaserWarnings() {
   for (let w of laserWarnings) {
+    if (w.cancelled) continue;
     // Use source position (character center) as laser start point
     const startX = w.sourceX || 300;
     if (!w.fired) {
