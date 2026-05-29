@@ -240,7 +240,7 @@ function draw() {
     drawBossHPBar();
     drawActiveEffectsUI();
   }
-  if (bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat' || bossPhase === 'defeat') {
+  if (bossPhase === 'dialogue' || bossPhase === 'victory' || bossPhase === 'defeat') {
     drawBossDialogue();
   }
 
@@ -300,11 +300,11 @@ async function fetchLeaderboard() {
   } catch (e) {}
 }
 
-async function submitScore(name, score) {
+async function submitScore(name, playerScore) {
   const res = await fetch('/api/score', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, score }),
+    body: JSON.stringify({ name, score: playerScore }),
   });
   return await res.json();
 }

@@ -85,13 +85,45 @@ for (let i = 0; i < 60; i++) {
   });
 }
 
+// Cached background gradient (created once)
+let cachedSkyGrad = null;
+function getSkyGradient() {
+  if (!cachedSkyGrad) {
+    cachedSkyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    cachedSkyGrad.addColorStop(0, '#0a0a2e');
+    cachedSkyGrad.addColorStop(0.5, '#141438');
+    cachedSkyGrad.addColorStop(1, '#1a1a40');
+  }
+  return cachedSkyGrad;
+}
+
+// Pre-rendered moon canvas
+let moonCanvas = null;
+function getMoonCanvas() {
+  if (!moonCanvas) {
+    moonCanvas = document.createElement('canvas');
+    moonCanvas.width = 40;
+    moonCanvas.height = 40;
+    const mctx = moonCanvas.getContext('2d');
+    mctx.fillStyle = '#FFE8A0';
+    for (let dy = -16; dy <= 16; dy += 2) {
+      for (let dx = -16; dx <= 16; dx += 2) {
+        if (dx * dx + dy * dy <= 256) {
+          mctx.fillRect(dx + 18, dy + 18, 2, 2);
+        }
+      }
+    }
+    mctx.fillStyle = '#EED680';
+    mctx.fillRect(14, 12, 4, 4);
+    mctx.fillRect(24, 20, 4, 4);
+    mctx.fillRect(16, 26, 4, 4);
+  }
+  return moonCanvas;
+}
+
 function drawBackground() {
-  // Night sky gradient
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
-  skyGrad.addColorStop(0, '#0a0a2e');
-  skyGrad.addColorStop(0.5, '#141438');
-  skyGrad.addColorStop(1, '#1a1a40');
-  ctx.fillStyle = skyGrad;
+  // Night sky gradient (cached)
+  ctx.fillStyle = getSkyGradient();
   ctx.fillRect(0, 0, W, H);
 
   // Stars (flicker)
@@ -103,20 +135,9 @@ function drawBackground() {
   }
   ctx.globalAlpha = 1;
 
-  // Moon (pixel circle)
-  ctx.fillStyle = '#FFE8A0';
+  // Moon (pre-rendered offscreen canvas)
   const moonX = W - 70, moonY = 60;
-  for (let dy = -16; dy <= 16; dy += 2) {
-    for (let dx = -16; dx <= 16; dx += 2) {
-      if (dx * dx + dy * dy <= 256) {
-        ctx.fillRect(moonX + dx, moonY + dy, 2, 2);
-      }
-    }
-  }
-  ctx.fillStyle = '#EED680';
-  ctx.fillRect(moonX - 4, moonY - 6, 4, 4);
-  ctx.fillRect(moonX + 6, moonY + 2, 4, 4);
-  ctx.fillRect(moonX - 2, moonY + 8, 4, 4);
+  ctx.drawImage(getMoonCanvas(), moonX - 18, moonY - 18);
 
   // Ground (dark road)
   ctx.fillStyle = '#1a1a28';
