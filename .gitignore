@@ -1,4 +1,26 @@
+# Dependencies
+node_modules/
+
+# Database files
 leaderboard.db
 leaderboard.db-shm
 leaderboard.db-wal
-node_modules/
+
+# Logs
+server.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+
