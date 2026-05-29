@@ -7,12 +7,6 @@ const PORT = 2333;
 
 app.disable('x-powered-by');
 
-// Clear cached HSTS (temporary, remove after all users cleared)
-app.use((req, res, next) => {
-  res.setHeader('Strict-Transport-Security', 'max-age=0');
-  next();
-});
-
 // Trust proxy (for correct req.ip behind reverse proxy)
 app.set('trust proxy', 1);
 
