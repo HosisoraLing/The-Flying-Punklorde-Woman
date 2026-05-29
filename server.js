@@ -1,35 +1,12 @@
 const express = require('express');
 const Database = require('better-sqlite3');
 const path = require('path');
-const helmet = require('helmet');
 
 const app = express();
 const PORT = 2333;
 
-// Security headers
+// Hide Express tech stack
 app.disable('x-powered-by');
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcAttr: ["'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      mediaSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      frameAncestors: ["'self'"],
-      upgradeInsecureRequests: null,
-    },
-  },
-  crossOriginEmbedderPolicy: false,
-  crossOriginOpenerPolicy: false,
-  crossOriginResourcePolicy: false,
-  originAgentCluster: false,
-  strictTransportSecurity: false,
-}));
 
 // Trust proxy (for correct req.ip behind reverse proxy)
 app.set('trust proxy', 1);
