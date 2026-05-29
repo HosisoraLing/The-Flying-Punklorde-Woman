@@ -21,12 +21,14 @@ app.use(helmet({
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       frameAncestors: ["'self'"],
+      upgradeInsecureRequests: null,
     },
   },
   crossOriginEmbedderPolicy: false,
   crossOriginOpenerPolicy: false,
   crossOriginResourcePolicy: false,
   originAgentCluster: false,
+  strictTransportSecurity: false,
 }));
 
 // Trust proxy (for correct req.ip behind reverse proxy)
